@@ -89,12 +89,12 @@ async function onAction(req: ActionRequest) {
         .select('invite_token, client_profiles(email, name), coaching_packages(title)')
         .eq('enrollment_id', p.enrollmentId)
         .single();
-      const client = enrollment?.client_profiles as Record<string, unknown>;
+      const client = enrollment?.client_profiles as unknown as Record<string, unknown>;
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from:    process.env.FROM_EMAIL ?? 'noreply@coachplatform.com',
         to:      client?.email as string,
-        subject: `Your next module in ${(enrollment?.coaching_packages as Record<string, unknown>)?.title} is ready`,
+        subject: `Your next module in ${(enrollment?.coaching_packages as unknown as Record<string, unknown>)?.title} is ready`,
         html:    `<p>Hi ${client?.name}, ${p.message ?? 'Keep going — your next module awaits!'}</p><a href="https://${process.env.PLATFORM_DOMAIN}/portal/${enrollment?.invite_token}">Continue learning</a>`,
       });
       return { success: true, message: 'Nudge sent' };

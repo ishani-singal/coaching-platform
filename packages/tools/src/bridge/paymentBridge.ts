@@ -12,7 +12,7 @@ export async function createPaymentLink(userId: string, params: {
     description:  params.description,
     redirect_url: params.redirectUrl,
   });
-  return r.data as PaymentLink;
+  return r.data as unknown as PaymentLink;
 }
 
 export async function getTransactions(userId: string, since?: string) {

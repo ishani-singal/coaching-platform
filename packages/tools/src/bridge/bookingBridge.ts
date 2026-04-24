@@ -8,7 +8,7 @@ export async function createBookingPage(userId: string, params: {
   title: string; durationMins: number; description?: string; priceUsd?: number;
 }): Promise<BookingPage> {
   const r = await callAgentAction(ID, userId, 'create_booking_page', params);
-  return r.data as BookingPage;
+  return r.data as unknown as BookingPage;
 }
 
 export async function getBookingPages(userId: string): Promise<BookingPage[]> {

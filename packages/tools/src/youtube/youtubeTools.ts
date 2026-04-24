@@ -88,7 +88,8 @@ function extractVideoId(url: string): string {
   throw new Error(`Cannot extract video ID from: ${url}`);
 }
 
-async function ytGet(endpoint: string, params: Record<string, string>): Promise<Record<string, unknown>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ytGet(endpoint: string, params: Record<string, string>): Promise<any> {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) throw new Error('YOUTUBE_API_KEY not set');
   const qs = new URLSearchParams({ ...params, key }).toString();

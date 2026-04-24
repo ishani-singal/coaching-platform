@@ -37,7 +37,7 @@ export async function computeAndWriteRevenue(enrollmentId: string, priceUsd: num
   // Collect all module IDs
   const moduleIds: string[] = [];
   for (const pp of programs ?? []) {
-    const prog = pp.programs as { program_modules: { module_id: string }[] };
+    const prog = pp.programs as unknown as { program_modules: { module_id: string }[] };
     for (const pm of prog.program_modules ?? []) {
       moduleIds.push(pm.module_id);
     }

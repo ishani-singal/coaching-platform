@@ -38,7 +38,7 @@ export async function publishPackage(packageId: string): Promise<void> {
   if (!programs || programs.length === 0) throw new Error('No programs linked');
 
   for (const pp of programs) {
-    const prog = pp.programs as Record<string, unknown>;
+    const prog = pp.programs as unknown as Record<string, unknown>;
     if (!prog.is_published) throw new Error(`Program ${pp.program_id} is unpublished`);
     const pms = prog.program_modules as { module_id: string; modules: { is_published: boolean } }[];
     for (const pm of pms ?? []) {

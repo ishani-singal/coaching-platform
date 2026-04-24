@@ -1,14 +1,11 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const sdk_1 = require("@coaching/sdk");
 const tools_1 = require("@coaching/tools");
 const skills_1 = require("@coaching/skills");
-const sdk_2 = __importDefault(require("@anthropic-ai/sdk"));
+const generative_ai_1 = require("@google/generative-ai");
 const tools_2 = require("@coaching/tools");
-const sdk_3 = require("@coaching/sdk");
+const sdk_2 = require("@coaching/sdk");
 const PORT = parseInt(process.env.AGENT_PERSONA_CHAT_PORT ?? '3004', 10);
 const AGENT_ID = 'coaching-persona-chat';
 (0, tools_1.configureBridge)({ mode: 'http', authToken: process.env.SKILLZ_AGENT_AUTH_TOKEN });
@@ -86,23 +83,23 @@ async function onAction(req) {
         case 'build_persona': {
             const sources = await (0, tools_2.getPersonaSources)(uid);
             const combined = sources.map(s => s.content ?? s.url ?? '').join('\n\n');
-            const client = new sdk_2.default();
-            const msg = await client.messages.create({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 512,
-                system: 'Extract tone, style, and a one-sentence summary from these coach materials. Reply as JSON: { "tone": "...", "style": "...", "summary": "..." }',
-                messages: [{ role: 'user', content: combined || 'I am a coach.' }],
+            const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const gemini = genai.getGenerativeModel({
+                model: 'gemini-2.5-flash-preview-04-17',
+                systemInstruction: 'Extract tone, style, and a one-sentence summary from these coach materials. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }',
             });
+            const result = await gemini.generateContent(combined || 'I am a coach.');
+            const rawText = result.response.text().trim().replace(/^```json\s*|```$/g, '');
             let tone = 'encouraging', style = 'conversational', summary = 'A dedicated coach.';
             try {
-                const parsed = JSON.parse(msg.content[0].text);
+                const parsed = JSON.parse(rawText);
                 tone = parsed.tone ?? tone;
                 style = parsed.style ?? style;
                 summary = parsed.summary ?? summary;
             }
             catch { /* use defaults */ }
             const snap = await (0, tools_1.savePersonaSnapshot)(uid, tone, style, summary, { sources: sources.length });
-            await sdk_3.supabase.from('coach_profiles').update({ persona_snapshot_id: snap.id }).eq('coach_id', uid);
+            await sdk_2.supabase.from('coach_profiles').update({ persona_snapshot_id: snap.id }).eq('coach_id', uid);
             return { success: true, message: 'Persona built', data: snap };
         }
         case 'add_source':

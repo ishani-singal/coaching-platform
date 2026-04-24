@@ -11,7 +11,7 @@
   "dependencies": {
     "@coaching/sdk": "workspace:*",
     "@coaching/tools": "workspace:*",
-    "@anthropic-ai/sdk": "^0.36.0",
+    "@google/generative-ai": "^0.24.0",
     "resend": "^3.0.0"
   },
   "devDependencies": {

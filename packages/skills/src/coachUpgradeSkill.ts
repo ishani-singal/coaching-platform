@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CoachProfile } from '@coaching/sdk';
 import { upgradeToCoach as upgradeCoachTool, checkSlugAvailable, addPersonaSource, savePersonaSnapshot, setPersonaSnapshot } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
@@ -26,17 +26,17 @@ export async function upgradeToCoach(
   );
 
   // Build initial persona snapshot via LLM
-  const client = new Anthropic();
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 256,
-    system: 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON: { "tone": "...", "style": "...", "summary": "..." }',
-    messages: [{ role: 'user', content: source.content ?? '' }],
+  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genai.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-04-17',
+    systemInstruction: 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }',
   });
+  const result = await model.generateContent(source.content ?? '');
+  const rawText = result.response.text().trim().replace(/^```json\s*|```$/g, '');
 
   let tone = 'encouraging', style = 'conversational', summary = `I am ${displayName}.`;
   try {
-    const parsed = JSON.parse((msg.content[0] as { text: string }).text);
+    const parsed = JSON.parse(rawText);
     tone    = parsed.tone    ?? tone;
     style   = parsed.style   ?? style;
     summary = parsed.summary ?? summary;

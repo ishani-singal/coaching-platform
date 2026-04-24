@@ -1,7 +1,7 @@
 import { createAgentServer, requireShellToken, AgentManifest, ContextRequest, ActionRequest, ClientProfile } from '@coaching/sdk';
 import { configureBridge, getCoachBySlug, addPersonaSource, removePersonaSource, getLatestPersonaSnapshot, savePersonaSnapshot, updateCoachTheme } from '@coaching/tools';
 import { getRecommendations, streamPersonaChat } from '@coaching/skills';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getPersonaSources } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
 import type { Request, Response } from 'express';
@@ -89,16 +89,16 @@ async function onAction(req: ActionRequest) {
     case 'build_persona': {
       const sources = await getPersonaSources(uid);
       const combined = sources.map(s => s.content ?? s.url ?? '').join('\n\n');
-      const client = new Anthropic();
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        system: 'Extract tone, style, and a one-sentence summary from these coach materials. Reply as JSON: { "tone": "...", "style": "...", "summary": "..." }',
-        messages: [{ role: 'user', content: combined || 'I am a coach.' }],
+      const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+      const gemini = genai.getGenerativeModel({
+        model: 'gemini-2.5-flash-preview-04-17',
+        systemInstruction: 'Extract tone, style, and a one-sentence summary from these coach materials. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }',
       });
+      const result = await gemini.generateContent(combined || 'I am a coach.');
+      const rawText = result.response.text().trim().replace(/^```json\s*|```$/g, '');
       let tone = 'encouraging', style = 'conversational', summary = 'A dedicated coach.';
       try {
-        const parsed = JSON.parse((msg.content[0] as { text: string }).text);
+        const parsed = JSON.parse(rawText);
         tone = parsed.tone ?? tone; style = parsed.style ?? style; summary = parsed.summary ?? summary;
       } catch { /* use defaults */ }
       const snap = await savePersonaSnapshot(uid, tone, style, summary, { sources: sources.length });

@@ -1,18 +1,15 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkSlugAvailable = void 0;
 exports.upgradeToCoach = upgradeToCoach;
-const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
+const generative_ai_1 = require("@google/generative-ai");
 const tools_1 = require("@coaching/tools");
 Object.defineProperty(exports, "checkSlugAvailable", { enumerable: true, get: function () { return tools_1.checkSlugAvailable; } });
-const sdk_2 = require("@coaching/sdk");
+const sdk_1 = require("@coaching/sdk");
 async function upgradeToCoach(userId, slug, displayName) {
     const coachProfile = await (0, tools_1.upgradeToCoach)(userId, slug, displayName);
     // Seed an empty draft package
-    await sdk_2.supabase.from('coaching_packages').insert({
+    await sdk_1.supabase.from('coaching_packages').insert({
         coach_id: userId,
         title: 'My First Package',
         pricing_model: 'free',
@@ -21,16 +18,16 @@ async function upgradeToCoach(userId, slug, displayName) {
     // Add a welcome persona source
     const source = await (0, tools_1.addPersonaSource)(userId, 'text', `I am ${displayName}, a coach passionate about helping people reach their goals.`);
     // Build initial persona snapshot via LLM
-    const client = new sdk_1.default();
-    const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 256,
-        system: 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON: { "tone": "...", "style": "...", "summary": "..." }',
-        messages: [{ role: 'user', content: source.content ?? '' }],
+    const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genai.getGenerativeModel({
+        model: 'gemini-2.5-flash-preview-04-17',
+        systemInstruction: 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }',
     });
+    const result = await model.generateContent(source.content ?? '');
+    const rawText = result.response.text().trim().replace(/^```json\s*|```$/g, '');
     let tone = 'encouraging', style = 'conversational', summary = `I am ${displayName}.`;
     try {
-        const parsed = JSON.parse(msg.content[0].text);
+        const parsed = JSON.parse(rawText);
         tone = parsed.tone ?? tone;
         style = parsed.style ?? style;
         summary = parsed.summary ?? summary;

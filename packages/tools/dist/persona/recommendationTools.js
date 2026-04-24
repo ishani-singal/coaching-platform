@@ -1,14 +1,11 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scoreLibraryItemsForClient = scoreLibraryItemsForClient;
 exports.scorePackagesForClient = scorePackagesForClient;
 exports.formatRecommendationInPersona = formatRecommendationInPersona;
 exports.streamChatInPersona = streamChatInPersona;
 exports.toPersonaRecommendations = toPersonaRecommendations;
-const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
+const generative_ai_1 = require("@google/generative-ai");
 function scoreLibraryItemsForClient(items, profile) {
     const focusAreas = profile.preferences.focusAreas ?? [];
     const goalWords = (profile.goals ?? '').toLowerCase().split(/\s+/);
@@ -30,21 +27,20 @@ function scorePackagesForClient(packages, profile) {
     }).sort((a, b) => b.score - a.score);
 }
 async function formatRecommendationInPersona(items, snapshot, query) {
-    const client = new sdk_1.default();
+    const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genai.getGenerativeModel({
+        model: 'gemini-2.5-flash-preview-04-17',
+        systemInstruction: `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`,
+    });
     const context = items.slice(0, 5).map(s => {
         const item = s.item;
         return `- ${item.title}: ${item.description ?? ''}`;
     }).join('\n');
-    const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        system: `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`,
-        messages: [{ role: 'user', content: `${query}\n\nRelevant resources:\n${context}` }],
-    });
-    return msg.content[0].text;
+    const result = await model.generateContent(`${query}\n\nRelevant resources:\n${context}`);
+    return result.response.text();
 }
 async function* streamChatInPersona(snapshot, clientProfile, history, message) {
-    const client = new sdk_1.default();
+    const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const systemPrompt = [
         `You are ${snapshot.summary}.`,
         `Tone: ${snapshot.tone}. Style: ${snapshot.style}.`,
@@ -52,20 +48,21 @@ async function* streamChatInPersona(snapshot, clientProfile, history, message) {
             ? `You are speaking with ${clientProfile.name}. Their goals: ${clientProfile.goals}.`
             : 'You are speaking with a prospective client.',
     ].join('\n');
-    const stream = client.messages.stream({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-            ...history,
-            { role: 'user', content: message },
-        ],
+    const model = genai.getGenerativeModel({
+        model: 'gemini-2.5-flash-preview-04-17',
+        systemInstruction: systemPrompt,
     });
-    for await (const event of stream) {
-        if (event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta') {
-            yield event.delta.text;
-        }
+    const chat = model.startChat({
+        history: history.map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+        })),
+    });
+    const result = await chat.sendMessageStream(message);
+    for await (const chunk of result.stream) {
+        const text = chunk.text();
+        if (text)
+            yield text;
     }
 }
 function toPersonaRecommendations(scored) {

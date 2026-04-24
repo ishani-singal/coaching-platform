@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LibraryItem, CoachingPackage, ClientProfile, PersonaSnapshot, ScoredItem, PersonaRecommendation } from '@coaching/sdk';
 
 export function scoreLibraryItemsForClient(items: LibraryItem[], profile: ClientProfile): ScoredItem[] {
@@ -30,19 +30,18 @@ export async function formatRecommendationInPersona(
   snapshot: PersonaSnapshot,
   query: string
 ): Promise<string> {
-  const client = new Anthropic();
+  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genai.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-04-17',
+    systemInstruction: `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`,
+  });
   const context = items.slice(0, 5).map(s => {
     const item = s.item as LibraryItem;
     return `- ${item.title}: ${item.description ?? ''}`;
   }).join('\n');
 
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 512,
-    system: `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`,
-    messages: [{ role: 'user', content: `${query}\n\nRelevant resources:\n${context}` }],
-  });
-  return (msg.content[0] as { text: string }).text;
+  const result = await model.generateContent(`${query}\n\nRelevant resources:\n${context}`);
+  return result.response.text();
 }
 
 export async function* streamChatInPersona(
@@ -51,7 +50,7 @@ export async function* streamChatInPersona(
   history: { role: 'user' | 'assistant'; content: string }[],
   message: string
 ): AsyncGenerator<string> {
-  const client = new Anthropic();
+  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const systemPrompt = [
     `You are ${snapshot.summary}.`,
     `Tone: ${snapshot.tone}. Style: ${snapshot.style}.`,
@@ -60,23 +59,22 @@ export async function* streamChatInPersona(
       : 'You are speaking with a prospective client.',
   ].join('\n');
 
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: [
-      ...history,
-      { role: 'user', content: message },
-    ],
+  const model = genai.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-04-17',
+    systemInstruction: systemPrompt,
   });
 
-  for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      event.delta.type === 'text_delta'
-    ) {
-      yield event.delta.text;
-    }
+  const chat = model.startChat({
+    history: history.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+  });
+
+  const result = await chat.sendMessageStream(message);
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) yield text;
   }
 }
 

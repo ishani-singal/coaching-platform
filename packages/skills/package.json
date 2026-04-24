@@ -1,0 +1,21 @@
+{
+  "name": "@coaching/skills",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coaching/sdk": "workspace:*",
+    "@coaching/tools": "workspace:*",
+    "@anthropic-ai/sdk": "^0.36.0",
+    "resend": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

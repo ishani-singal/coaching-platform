@@ -1,0 +1,5 @@
+packages:
+  - 'packages/sdk'
+  - 'packages/tools'
+  - 'packages/skills'
+  - 'packages/agents/*'

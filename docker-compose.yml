@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  program-builder:
+    build: ./packages/agents/01-program-builder
+    ports: ['3001:3000']
+    env_file: .env
+
+  program-runner:
+    build: ./packages/agents/02-program-runner
+    ports: ['3002:3000']
+    env_file: .env
+
+  coach-library:
+    build: ./packages/agents/03-coach-library
+    ports: ['3003:3000']
+    env_file: .env
+
+  persona-chat:
+    build: ./packages/agents/04-persona-chat
+    ports: ['3004:3000']
+    env_file: .env
+
+  crm:
+    build: ./packages/agents/05-crm
+    ports: ['3005:3000']
+    env_file: .env
+
+  licensing:
+    build: ./packages/agents/06-licensing
+    ports: ['3006:3000']
+    env_file: .env

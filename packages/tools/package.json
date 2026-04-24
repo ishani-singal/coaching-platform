@@ -1,0 +1,20 @@
+{
+  "name": "@coaching/tools",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coaching/sdk": "workspace:*",
+    "@supabase/supabase-js": "^2",
+    "@anthropic-ai/sdk": "^0.36.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

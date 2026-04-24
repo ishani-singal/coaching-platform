@@ -1,0 +1,27 @@
+{
+  "name": "coaching-platform",
+  "private": true,
+  "description": "Coaching platform — Tools → Skills → Agents → Shell",
+  "workspaces": [
+    "packages/sdk",
+    "packages/tools",
+    "packages/skills",
+    "packages/agents/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

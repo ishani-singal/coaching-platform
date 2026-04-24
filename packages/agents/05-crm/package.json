@@ -1,0 +1,22 @@
+{
+  "name": "@coaching/agent-crm",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coaching/sdk": "workspace:*",
+    "@coaching/tools": "workspace:*",
+    "@coaching/skills": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.0"
+  }
+}

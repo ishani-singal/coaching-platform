@@ -29,6 +29,26 @@ const manifest: AgentManifest = {
   defaultScope:    'global',
   integrationTier: 1,
   uiSpec:          { baseArchitecture: 'flow-wizard' },
+  panelSpec: {
+    layout: 'two-column',
+    sections: [
+      { type: 'text-summary', id: 'pb-summary', title: 'Overview', dataKey: 'summary' },
+      { type: 'card-list',    id: 'pb-modules',  title: 'My Modules',          dataKey: 'modules',  titleKey: 'title', subtitleKey: 'category', metaKey: 'is_published' },
+      { type: 'action-form',  id: 'pb-create',   title: 'Create Module',       action: 'create_module', submitLabel: 'Create',
+        fields: [
+          { name: 'title',    label: 'Title',    inputType: 'text',   required: true },
+          { name: 'category', label: 'Category', inputType: 'select', required: true, options: ['mindset', 'nutrition', 'fitness', 'business', 'leadership'] },
+        ],
+      },
+      { type: 'action-form',  id: 'pb-program',  title: 'Build Program',       action: 'build_program', submitLabel: 'Build',
+        fields: [
+          { name: 'title',     label: 'Program Title',                  inputType: 'text',     required: true },
+          { name: 'moduleIds', label: 'Module IDs (comma-separated)',   inputType: 'textarea', required: true },
+        ],
+      },
+      { type: 'card-list',    id: 'pb-packages', title: 'Published Packages',  dataKey: 'packages', titleKey: 'title', subtitleKey: 'is_published' },
+    ],
+  },
   actions: [
     { name: 'create_module',         description: 'Create a new module',                    params: { title: { type: 'string', required: true, description: 'Module title' }, category: { type: 'string', required: true, description: 'Category' }, derivedFromModuleId: { type: 'string', required: false, description: 'Parent module ID' } } },
     { name: 'add_section',           description: 'Add content section to a module',        params: { moduleId: { type: 'string', required: true, description: '' }, contentType: { type: 'string', required: true, description: '' }, body: { type: 'object', required: true, description: '' }, visibleTo: { type: 'array', required: true, description: '' } } },
@@ -62,6 +82,10 @@ async function onContext(req: ContextRequest) {
       keyEntities: (packages ?? []).slice(0, 5).map((p: Record<string, unknown>) => ({ id: p.package_id as string, type: 'package', label: p.title as string, attributes: {} })),
       recentEvents: [],
       pendingActions: drafts.slice(0, 3).map((m: Record<string, unknown>) => ({ type: 'draft_module', label: `Module "${m.title}" is unpublished`, priority: 'medium' as const })),
+      rawContext: {
+        modules:  (modules ?? []).map((m: Record<string, unknown>) => ({ module_id: m.module_id, title: m.title, category: m.category ?? '', is_published: m.is_published ? 'published' : 'draft' })),
+        packages: (packages ?? []).map((p: Record<string, unknown>) => ({ package_id: p.package_id, title: p.title, is_published: p.is_published ? 'published' : 'draft' })),
+      },
     },
   };
 }

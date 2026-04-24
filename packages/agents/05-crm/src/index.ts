@@ -20,6 +20,34 @@ const manifest: AgentManifest = {
   defaultScope:    'global',
   integrationTier: 1,
   uiSpec:          { baseArchitecture: 'table' },
+  panelSpec: {
+    layout: 'single-column',
+    sections: [
+      { type: 'text-summary', id: 'crm-summary',    title: 'CRM Overview', dataKey: 'summary' },
+      { type: 'table',        id: 'crm-clients',     title: 'Clients',      dataKey: 'clients',
+        columns: [
+          { key: 'name',     label: 'Name',   type: 'text' },
+          { key: 'email',    label: 'Email',  type: 'text' },
+          { key: 'status',   label: 'Status', type: 'badge',
+            badgeColors: { active: 'bg-green-100 text-green-700', inactive: 'bg-gray-100 text-gray-500', lead: 'bg-blue-100 text-blue-700' },
+          },
+          { key: 'clientId', label: 'Note',   type: 'action-button', actionName: 'add_note' },
+        ],
+      },
+      { type: 'action-form', id: 'crm-add-note', title: 'Add Note', action: 'add_note', submitLabel: 'Save Note',
+        fields: [
+          { name: 'clientId', label: 'Client ID', inputType: 'text',     required: true },
+          { name: 'note',     label: 'Note',       inputType: 'textarea', required: true },
+        ],
+      },
+      { type: 'action-form', id: 'crm-add-tag', title: 'Tag Client', action: 'add_tag', submitLabel: 'Add Tag',
+        fields: [
+          { name: 'clientId', label: 'Client ID', inputType: 'text', required: true },
+          { name: 'tag',      label: 'Tag',        inputType: 'text', required: true },
+        ],
+      },
+    ],
+  },
   actions: [
     { name: 'get_client_list',   description: 'Get all clients with optional filter', params: { tag: { type: 'string', required: false, description: '' }, status: { type: 'string', required: false, description: '' } } },
     { name: 'get_client_detail', description: 'Get full client detail',              params: { clientId: { type: 'string', required: true, description: '' } } },
@@ -52,6 +80,9 @@ async function onContext(req: ContextRequest) {
       keyEntities: clients.slice(0, 5).map(c => ({ id: c.clientId, type: 'client', label: c.name, attributes: { email: c.email } })),
       recentEvents: [],
       pendingActions: [],
+      rawContext: {
+        clients: clients.map(c => ({ clientId: c.clientId, name: c.name, email: c.email, status: (c as unknown as Record<string, unknown>).status ?? 'active' })),
+      },
     },
   };
 }

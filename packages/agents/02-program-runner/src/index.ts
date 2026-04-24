@@ -22,6 +22,28 @@ const manifest: AgentManifest = {
   defaultScope:    'global',
   integrationTier: 1,
   uiSpec:          { baseArchitecture: 'dashboard' },
+  panelSpec: {
+    layout: 'single-column',
+    sections: [
+      { type: 'text-summary', id: 'pr-summary',     title: 'Enrollment Overview', dataKey: 'summary' },
+      { type: 'table',        id: 'pr-enrollments',  title: 'Active Enrollments',  dataKey: 'enrollments',
+        columns: [
+          { key: 'client_name',   label: 'Client',   type: 'text' },
+          { key: 'package_title', label: 'Package',  type: 'text' },
+          { key: 'enrolled_at',   label: 'Enrolled', type: 'date' },
+          { key: 'enrollment_id', label: 'Nudge',    type: 'action-button', actionName: 'send_nudge' },
+        ],
+      },
+      { type: 'action-form', id: 'pr-enroll', title: 'Enroll Client', action: 'enroll_client', submitLabel: 'Enroll',
+        fields: [
+          { name: 'clientName',     label: 'Client Name', inputType: 'text',   required: true },
+          { name: 'clientEmail',    label: 'Email',       inputType: 'text',   required: true },
+          { name: 'packageId',      label: 'Package ID',  inputType: 'text',   required: true },
+          { name: 'enrollmentType', label: 'Type',        inputType: 'select', required: true, options: ['client', 'trainee'] },
+        ],
+      },
+    ],
+  },
   actions: [
     { name: 'enroll_client',       description: 'Enroll a client in a package',     params: { packageId: { type: 'string', required: true, description: '' }, clientName: { type: 'string', required: true, description: '' }, clientEmail: { type: 'string', required: true, description: '' }, clientPhone: { type: 'string', required: false, description: '' }, goals: { type: 'string', required: false, description: '' }, background: { type: 'string', required: false, description: '' }, enrollmentType: { type: 'string', required: true, description: 'client | trainee', enum: ['client', 'trainee'] } } },
     { name: 'get_dashboard',       description: 'Get coach enrollment dashboard',   params: {} },
@@ -37,7 +59,7 @@ async function onContext(req: ContextRequest) {
   const userId = req.userId;
   const { data: enrollments } = await supabase
     .from('enrollments')
-    .select('enrollment_id, completed_at, client_id')
+    .select('enrollment_id, completed_at, enrolled_at, client_id, client_profiles(name), coaching_packages(title)')
     .eq('installing_coach_id', userId);
 
   const active    = (enrollments ?? []).filter((e: Record<string, unknown>) => !e.completed_at).length;
@@ -52,6 +74,16 @@ async function onContext(req: ContextRequest) {
       keyEntities: [],
       recentEvents: [],
       pendingActions: [],
+      rawContext: {
+        enrollments: (enrollments ?? [])
+          .filter((e: Record<string, unknown>) => !e.completed_at)
+          .map((e: Record<string, unknown>) => ({
+            enrollment_id: e.enrollment_id,
+            client_name:   (e.client_profiles as Record<string, unknown> | null)?.name ?? 'Unknown',
+            package_title: (e.coaching_packages as Record<string, unknown> | null)?.title ?? '—',
+            enrolled_at:   e.enrolled_at,
+          })),
+      },
     },
   };
 }

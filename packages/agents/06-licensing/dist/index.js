@@ -17,6 +17,35 @@ const manifest = {
     defaultScope: 'global',
     integrationTier: 1,
     uiSpec: { baseArchitecture: 'dashboard' },
+    panelSpec: {
+        layout: 'two-column',
+        sections: [
+            { type: 'text-summary', id: 'lic-summary', title: 'Licensing Overview', dataKey: 'summary' },
+            { type: 'table', id: 'lic-granted', title: 'Licenses Granted', dataKey: 'granted',
+                columns: [
+                    { key: 'module_title', label: 'Module', type: 'text' },
+                    { key: 'licensee_name', label: 'Licensee', type: 'text' },
+                    { key: 'direct_cut_pct', label: 'Cut %', type: 'text' },
+                    { key: 'expires_at', label: 'Expires', type: 'date' },
+                ],
+            },
+            { type: 'table', id: 'lic-held', title: 'Licenses Held', dataKey: 'held',
+                columns: [
+                    { key: 'module_title', label: 'Module', type: 'text' },
+                    { key: 'licensor_name', label: 'From', type: 'text' },
+                    { key: 'expires_at', label: 'Expires', type: 'date' },
+                ],
+            },
+            { type: 'action-form', id: 'lic-grant', title: 'Grant License', action: 'grant_license', submitLabel: 'Grant',
+                fields: [
+                    { name: 'moduleId', label: 'Module ID', inputType: 'text', required: true },
+                    { name: 'licenseeCoachId', label: 'Licensee Coach ID', inputType: 'text', required: true },
+                    { name: 'directCutPct', label: 'Direct Cut %', inputType: 'number', required: true },
+                    { name: 'derivativeCutPct', label: 'Derivative Cut %', inputType: 'number', required: true },
+                ],
+            },
+        ],
+    },
     actions: [
         { name: 'get_license_dashboard', description: 'Get licensing overview', params: {} },
         { name: 'grant_license', description: 'Grant module license', params: { moduleId: { type: 'string', required: true, description: '' }, licenseeCoachId: { type: 'string', required: true, description: '' }, directCutPct: { type: 'number', required: true, description: '' }, derivativeCutPct: { type: 'number', required: true, description: '' }, propagateToDepth: { type: 'number', required: false, description: '' }, canSublicense: { type: 'boolean', required: false, description: '' } } },
@@ -52,6 +81,19 @@ async function onContext(req) {
                 dueAt: l.expires_at,
                 priority: 'high',
             })),
+            rawContext: {
+                granted: dashboard.granted.map(l => ({
+                    module_title: l.module_title ?? l.module_id,
+                    licensee_name: l.licensee_name ?? l.licensee_coach_id,
+                    direct_cut_pct: `${l.direct_cut_pct}%`,
+                    expires_at: l.expires_at ?? null,
+                })),
+                held: dashboard.held.map(l => ({
+                    module_title: l.module_title ?? l.module_id,
+                    licensor_name: l.licensor_name ?? l.licensor_coach_id,
+                    expires_at: l.expires_at ?? null,
+                })),
+            },
         },
     };
 }

@@ -1,4 +1,4 @@
-import { createAgentServer, AgentManifest, ContextRequest, ActionRequest, ClientProfile } from '@coaching/sdk';
+import { createAgentServer, requireShellToken, AgentManifest, ContextRequest, ActionRequest, ClientProfile } from '@coaching/sdk';
 import { configureBridge, getCoachBySlug, addPersonaSource, removePersonaSource, getLatestPersonaSnapshot, savePersonaSnapshot, updateCoachTheme } from '@coaching/tools';
 import { getRecommendations, streamPersonaChat } from '@coaching/skills';
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,6 +21,23 @@ const manifest: AgentManifest = {
   defaultScope:    'global',
   integrationTier: 1,
   uiSpec:          { baseArchitecture: 'chat-augment' },
+  panelSpec: {
+    layout: 'two-column',
+    sections: [
+      { type: 'text-summary', id: 'pc-summary',      title: 'Persona Status',      dataKey: 'personaSummary' },
+      { type: 'card-list',    id: 'pc-sources',       title: 'Persona Sources',     dataKey: 'sources', titleKey: 'sourceType', subtitleKey: 'url',
+        actionButton: { label: 'Remove', actionName: 'remove_source', paramKey: 'sourceId' },
+      },
+      { type: 'action-form',  id: 'pc-add-source',   title: 'Add Source',          action: 'add_source', submitLabel: 'Add',
+        fields: [
+          { name: 'sourceType', label: 'Type',             inputType: 'select',   required: true, options: ['youtube', 'text', 'pdf', 'article'] },
+          { name: 'url',        label: 'URL (optional)',    inputType: 'text',     required: false },
+          { name: 'content',    label: 'Content (optional)',inputType: 'textarea', required: false },
+        ],
+      },
+      { type: 'action-form',  id: 'pc-build-persona', title: 'Build / Rebuild Persona', action: 'build_persona', submitLabel: 'Build Persona', fields: [] },
+    ],
+  },
   actions: [
     { name: 'build_persona',        description: 'Build persona snapshot from sources', params: {} },
     { name: 'add_source',           description: 'Add a persona source',               params: { sourceType: { type: 'string', required: true, description: '' }, content: { type: 'string', required: false, description: '' }, url: { type: 'string', required: false, description: '' } } },
@@ -46,6 +63,20 @@ async function onContext(req: ContextRequest) {
       keyEntities: [],
       recentEvents: [],
       pendingActions: [],
+      rawContext: {
+        personaSummary: snapshot
+          ? `Persona v${snapshot.version} · tone: ${snapshot.tone} · ${sources.length} source(s)`
+          : 'No persona built yet. Add sources and click Build Persona.',
+        sources: sources.map(s => {
+          const r = s as unknown as Record<string, unknown>;
+          return {
+            sourceId:   r.sourceId as string,
+            sourceType: r.sourceType as string,
+            url:        (r.url as string) ?? '',
+            content:    r.content ? (r.content as string).slice(0, 80) + '…' : '',
+          };
+        }),
+      },
     },
   };
 }
@@ -99,8 +130,8 @@ async function onAction(req: ActionRequest) {
 
 const app = createAgentServer(manifest, { context: onContext, action: onAction });
 
-// Public SSE chat endpoint
-app.post('/chat/stream', async (req: Request, res: Response) => {
+// SSE chat endpoint — validated by shell token
+app.post('/chat/stream', requireShellToken, async (req: Request, res: Response) => {
   try {
     const { coachSlug, clientProfile, message, history } = req.body as {
       coachSlug: string;

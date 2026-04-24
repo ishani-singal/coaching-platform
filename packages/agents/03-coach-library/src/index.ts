@@ -18,6 +18,33 @@ const manifest: AgentManifest = {
   defaultScope:    'global',
   integrationTier: 1,
   uiSpec:          { baseArchitecture: 'card-feed' },
+  panelSpec: {
+    layout: 'two-column',
+    sections: [
+      { type: 'text-summary', id: 'cl-summary',      title: 'Library Summary',        dataKey: 'summary' },
+      { type: 'card-list',    id: 'cl-items',         title: 'Library Items',           dataKey: 'items', titleKey: 'title', subtitleKey: 'itemType', metaKey: 'description',
+        actionButton: { label: 'Remove', actionName: 'remove_item', paramKey: 'itemId' },
+      },
+      { type: 'action-form',  id: 'cl-sync-youtube', title: 'Sync YouTube Channel',   action: 'sync_youtube', submitLabel: 'Sync',
+        fields: [{ name: 'channelUrl', label: 'Channel URL', inputType: 'text', required: true }],
+      },
+      { type: 'action-form',  id: 'cl-add-book',     title: 'Add Book',               action: 'add_book', submitLabel: 'Add Book',
+        fields: [
+          { name: 'title',       label: 'Title',       inputType: 'text',     required: true },
+          { name: 'author',      label: 'Author',      inputType: 'text',     required: true },
+          { name: 'description', label: 'Description', inputType: 'textarea', required: true },
+          { name: 'url',         label: 'URL',         inputType: 'text',     required: false },
+        ],
+      },
+      { type: 'action-form',  id: 'cl-add-article',  title: 'Add Article',            action: 'add_article', submitLabel: 'Add Article',
+        fields: [
+          { name: 'title',       label: 'Title',       inputType: 'text',     required: true },
+          { name: 'url',         label: 'URL',         inputType: 'text',     required: true },
+          { name: 'description', label: 'Description', inputType: 'textarea', required: true },
+        ],
+      },
+    ],
+  },
   actions: [
     { name: 'sync_youtube', description: 'Sync YouTube channel videos',  params: { channelUrl: { type: 'string', required: true, description: '' } } },
     { name: 'add_book',     description: 'Add a book to the library',    params: { title: { type: 'string', required: true, description: '' }, author: { type: 'string', required: true, description: '' }, url: { type: 'string', required: false, description: '' }, description: { type: 'string', required: true, description: '' }, tags: { type: 'array', required: true, description: '' } } },
@@ -47,6 +74,9 @@ async function onContext(req: ContextRequest) {
       pendingActions: untagged > 0
         ? [{ type: 'tag_items', label: `${untagged} item(s) untagged`, priority: 'low' as const }]
         : [],
+      rawContext: {
+        items: library.map(i => ({ itemId: i.itemId, title: i.title, itemType: i.itemType, description: i.description?.slice(0, 100) ?? '' })),
+      },
     },
   };
 }

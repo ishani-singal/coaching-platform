@@ -22,6 +22,23 @@ const manifest = {
     defaultScope: 'global',
     integrationTier: 1,
     uiSpec: { baseArchitecture: 'chat-augment' },
+    panelSpec: {
+        layout: 'two-column',
+        sections: [
+            { type: 'text-summary', id: 'pc-summary', title: 'Persona Status', dataKey: 'personaSummary' },
+            { type: 'card-list', id: 'pc-sources', title: 'Persona Sources', dataKey: 'sources', titleKey: 'sourceType', subtitleKey: 'url',
+                actionButton: { label: 'Remove', actionName: 'remove_source', paramKey: 'sourceId' },
+            },
+            { type: 'action-form', id: 'pc-add-source', title: 'Add Source', action: 'add_source', submitLabel: 'Add',
+                fields: [
+                    { name: 'sourceType', label: 'Type', inputType: 'select', required: true, options: ['youtube', 'text', 'pdf', 'article'] },
+                    { name: 'url', label: 'URL (optional)', inputType: 'text', required: false },
+                    { name: 'content', label: 'Content (optional)', inputType: 'textarea', required: false },
+                ],
+            },
+            { type: 'action-form', id: 'pc-build-persona', title: 'Build / Rebuild Persona', action: 'build_persona', submitLabel: 'Build Persona', fields: [] },
+        ],
+    },
     actions: [
         { name: 'build_persona', description: 'Build persona snapshot from sources', params: {} },
         { name: 'add_source', description: 'Add a persona source', params: { sourceType: { type: 'string', required: true, description: '' }, content: { type: 'string', required: false, description: '' }, url: { type: 'string', required: false, description: '' } } },
@@ -45,6 +62,20 @@ async function onContext(req) {
             keyEntities: [],
             recentEvents: [],
             pendingActions: [],
+            rawContext: {
+                personaSummary: snapshot
+                    ? `Persona v${snapshot.version} · tone: ${snapshot.tone} · ${sources.length} source(s)`
+                    : 'No persona built yet. Add sources and click Build Persona.',
+                sources: sources.map(s => {
+                    const r = s;
+                    return {
+                        sourceId: r.sourceId,
+                        sourceType: r.sourceType,
+                        url: r.url ?? '',
+                        content: r.content ? r.content.slice(0, 80) + '…' : '',
+                    };
+                }),
+            },
         },
     };
 }
@@ -91,8 +122,8 @@ async function onAction(req) {
     }
 }
 const app = (0, sdk_1.createAgentServer)(manifest, { context: onContext, action: onAction });
-// Public SSE chat endpoint
-app.post('/chat/stream', async (req, res) => {
+// SSE chat endpoint — validated by shell token
+app.post('/chat/stream', sdk_1.requireShellToken, async (req, res) => {
     try {
         const { coachSlug, clientProfile, message, history } = req.body;
         const coach = await (0, tools_1.getCoachBySlug)(coachSlug);

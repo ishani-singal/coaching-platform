@@ -13,7 +13,11 @@ import {
 import { supabase } from '@coaching/sdk';
 import { computeAndWriteRevenue } from './licensingSkill';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY ?? 'placeholder');
+  return _resend;
+}
 
 export async function enrollClient(
   packageId: string,
@@ -38,7 +42,7 @@ export async function enrollClient(
 
   const portalUrl = `https://${process.env.PLATFORM_DOMAIN}/portal/${enrollment.inviteToken}`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from:    process.env.FROM_EMAIL ?? 'noreply@coachplatform.com',
     to:      client.email,
     subject: `You've been invited to ${pkg?.title ?? 'a coaching program'}`,

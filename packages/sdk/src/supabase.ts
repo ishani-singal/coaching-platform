@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import path from 'path';
+
+// Load .env from repo root when running via ts-node (dev mode)
+if (!process.env.SUPABASE_URL) {
+  config({ path: path.resolve(__dirname, '../../../.env') });
+}
 
 export const supabase = createClient(
   process.env.SUPABASE_URL!,

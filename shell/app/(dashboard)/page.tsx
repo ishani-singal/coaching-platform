@@ -1,4 +1,6 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 
 const AGENTS = [
   { id: 'coaching-program-builder', port: 3001, label: '📚 Program Builder' },
@@ -26,8 +28,10 @@ async function fetchSnapshot(port: number, userId: string) {
 }
 
 export default async function DashboardHome() {
-  // In production, get userId from Supabase session
-  const userId = 'demo-user-id';
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+  const userId = user.id;
 
   const snapshots = await Promise.all(
     AGENTS.map(async a => ({ ...a, snapshot: await fetchSnapshot(a.port, userId) }))

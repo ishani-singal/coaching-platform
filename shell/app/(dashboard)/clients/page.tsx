@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 type DashboardRow = { enrollmentId: string; clientName: string; packageTitle: string; enrollmentType: string; completedAt: string | null };
 

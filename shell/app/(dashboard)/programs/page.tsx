@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 export default function ProgramsPage() {
+  const { userId } = useSession();
   const [tab, setTab] = useState<'modules' | 'programs' | 'packages'>('modules');
 
   async function callAction(action: string, params: Record<string, unknown>) {

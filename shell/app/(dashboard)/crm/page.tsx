@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from '@/components/SessionProvider';
 
 type Client = { clientId: string; name: string; email: string; tags: string[]; enrollmentStatus: string };
 type Overview = { active: Client[]; completed: Client[]; prospect: Client[] };

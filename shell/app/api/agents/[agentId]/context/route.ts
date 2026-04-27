@@ -15,9 +15,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   if (!port) return NextResponse.json({ error: 'Unknown agent' }, { status: 404 });
 
   const body = await req.text();
+  const token = process.env.SHELL_INTERNAL_TOKEN;
   const res = await fetch(`http://localhost:${port}/context`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body,
   });
   const data = await res.json();

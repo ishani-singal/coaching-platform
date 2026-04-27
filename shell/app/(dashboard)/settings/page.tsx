@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 export default function SettingsPage() {
+  const { userId } = useSession();
   const [slug, setSlug] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [slugStatus, setSlugStatus] = useState('');
@@ -19,8 +21,8 @@ export default function SettingsPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: 'demo-user-id', slug, displayName }),
-    }).then(r => r.json()) as { success: boolean; data: { subdomainUrl: string } };
-    setUpgradeStatus(r.success ? `✓ Coach profile created! URL: ${r.data?.subdomainUrl}` : '✗ Failed');
+    }).then(r => r.json()) as { success: boolean; message?: string; data: { subdomainUrl: string } };
+    setUpgradeStatus(r.success ? `✓ Coach profile created! URL: ${r.data?.subdomainUrl}` : `✗ Failed: ${r.message}`);
   }
 
   return (

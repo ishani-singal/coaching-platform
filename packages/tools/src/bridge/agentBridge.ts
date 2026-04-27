@@ -24,7 +24,7 @@ export async function callAgentAction(
       },
       body: JSON.stringify({ userId, config: {}, action, params } satisfies ActionRequest),
     });
-    if (!res.ok) throw new Error(`Skillz agent ${agentId} action '${action}' failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Agent ${agentId} action '${action}' failed: ${res.status}`);
     return res.json() as Promise<ActionResponse>;
   }
 
@@ -65,5 +65,5 @@ function resolveAgentUrl(agentId: string): string {
   const envKey = `SKILLZ_AGENT_${agentId.toUpperCase().replace(/-/g, '_')}_URL`;
   const url = process.env[envKey];
   if (url) return url;
-  throw new Error(`No URL configured for skillz agent '${agentId}'. Set ${envKey} in .env`);
+  throw new Error(`No URL configured for agent '${agentId}'. Set ${envKey} in .env`);
 }

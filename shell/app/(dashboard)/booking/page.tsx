@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 export default function BookingPage() {
+  const { userId } = useSession();
   const [form, setForm] = useState({ title: '', durationMins: 60, description: '', priceUsd: 0 });
   const [pages, setPages] = useState<{ bookingPageUrl: string; embedUrl: string; eventTypeId: string }[]>([]);
   const [payForm, setPayForm] = useState({ amountUsd: 0, description: '' });

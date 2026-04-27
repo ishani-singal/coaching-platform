@@ -1,7 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 export default function LicensingPage() {
+  const { userId } = useSession();
   const [dashboard, setDashboard] = useState<{ granted: unknown[]; held: unknown[]; revenueThisMonth: number } | null>(null);
   const [grantForm, setGrantForm] = useState({ moduleId: '', licenseeCoachId: '', directCutPct: 10, derivativeCutPct: 5, canSublicense: false });
   const [status, setStatus] = useState('');

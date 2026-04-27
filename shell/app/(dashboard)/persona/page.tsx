@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 type Snapshot = { version: number; tone: string; style: string; summary: string } | null;
 

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, use } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 type ClientDetail = {
   profile: { name: string; email: string; goals: string; background: string };

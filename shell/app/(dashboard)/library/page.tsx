@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from '@/components/SessionProvider';
 
 type LibraryItem = { itemId: string; itemType: string; title: string; url?: string; thumbnailUrl?: string; tags: string[] };
 

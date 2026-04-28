@@ -1,6 +1,23 @@
 import { supabase } from '@coaching/sdk';
 import { CoachProfile, ThemeConfig, CoachingPackage } from '@coaching/sdk';
 
+/** Idempotently ensures user_profiles + coach_profiles rows exist. Safe to call before any coach write. */
+export async function ensureCoachProfile(userId: string): Promise<void> {
+  const { error: upErr } = await supabase
+    .from('user_profiles')
+    .upsert({ user_id: userId, role: 'coach' }, { onConflict: 'user_id' });
+  if (upErr) throw new Error(`ensureCoachProfile user_profiles: ${upErr.message}`);
+
+  const slug = 'coach-' + userId.replace(/-/g, '').slice(0, 12);
+  const { error: cpErr } = await supabase
+    .from('coach_profiles')
+    .upsert(
+      { coach_id: userId, slug, display_name: 'My Coaching Practice' },
+      { onConflict: 'coach_id', ignoreDuplicates: true }
+    );
+  if (cpErr) throw new Error(`ensureCoachProfile coach_profiles: ${cpErr.message}`);
+}
+
 export async function upgradeToCoach(userId: string, slug: string, displayName: string): Promise<CoachProfile> {
   await supabase.from('user_profiles').upsert({ user_id: userId, role: 'coach' });
   const { data, error } = await supabase

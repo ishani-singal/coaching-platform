@@ -1,5 +1,6 @@
 import { createAgentServer, AgentManifest, ContextRequest, ActionRequest, PeriodType } from '@coaching/sdk';
-import { configureBridge, createProgramPeriod, listModulesForCoach, listProgramsForCoach, removeModuleFromProgram, getProgramWithPeriods, addSection, updateSection, deleteSection, updateModule, getAllModuleSections } from '@coaching/tools';
+// v2 - ensureCoachProfile added
+import { configureBridge, createProgramPeriod, listModulesForCoach, listProgramsForCoach, removeModuleFromProgram, getProgramWithPeriods, addSection, updateSection, deleteSection, updateModule, getAllModuleSections, ensureCoachProfile } from '@coaching/tools';
 import {
   scaffoldModule, addContentToSection, forkModule, previewModule,
 } from '@coaching/skills';
@@ -155,6 +156,7 @@ async function onAction(req: ActionRequest) {
     // ── Existing actions ──────────────────────────────────────────────────────
 
     case 'create_module':
+      await ensureCoachProfile(uid);
       return { success: true, message: 'Module created',
         data: await scaffoldModule(uid, p.title as string, p.category as string) as unknown as Record<string, unknown> };
 
@@ -194,10 +196,12 @@ async function onAction(req: ActionRequest) {
         data: await forkModule(p.moduleId as string, uid) as unknown as Record<string, unknown> };
 
     case 'build_program':
+      await ensureCoachProfile(uid);
       return { success: true, message: 'Program built',
         data: await buildProgram(uid, p.title as string, p.moduleIds as string[]) as unknown as Record<string, unknown> };
 
     case 'assemble_package':
+      await ensureCoachProfile(uid);
       return { success: true, message: 'Package assembled',
         data: await assemblePackage(uid, p.personaSnapshotId as string, p.title as string, p.programIds as string[], { model: p.pricingModel as never, priceUsd: p.priceUsd as number | undefined }) as unknown as Record<string, unknown> };
 
@@ -243,6 +247,7 @@ async function onAction(req: ActionRequest) {
     // ── New: timeline programs ────────────────────────────────────────────────
 
     case 'build_program_with_periods':
+      await ensureCoachProfile(uid);
       return { success: true, message: 'Program built',
         data: await buildProgramWithPeriods(
           uid,

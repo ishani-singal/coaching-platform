@@ -16,14 +16,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const body = await req.text();
   const token = process.env.SHELL_INTERNAL_TOKEN;
-  const res = await fetch(`http://localhost:${port}/context`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body,
-  });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await fetch(`http://localhost:${port}/context`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body,
+    });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (e: unknown) {
+    const msg = (e as Error).message ?? 'Agent unreachable';
+    return NextResponse.json({ success: false, message: `Agent ${agentId} error: ${msg}` }, { status: 502 });
+  }
 }

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ensureCoachProfile = ensureCoachProfile;
 exports.upgradeToCoach = upgradeToCoach;
 exports.getCoachBySlug = getCoachBySlug;
 exports.getCoachByCustomDomain = getCoachByCustomDomain;
@@ -8,6 +9,20 @@ exports.updateCoachTheme = updateCoachTheme;
 exports.setPersonaSnapshot = setPersonaSnapshot;
 exports.checkSlugAvailable = checkSlugAvailable;
 const sdk_1 = require("@coaching/sdk");
+/** Idempotently ensures user_profiles + coach_profiles rows exist. Safe to call before any coach write. */
+async function ensureCoachProfile(userId) {
+    const { error: upErr } = await sdk_1.supabase
+        .from('user_profiles')
+        .upsert({ user_id: userId, role: 'coach' }, { onConflict: 'user_id' });
+    if (upErr)
+        throw new Error(`ensureCoachProfile user_profiles: ${upErr.message}`);
+    const slug = 'coach-' + userId.replace(/-/g, '').slice(0, 12);
+    const { error: cpErr } = await sdk_1.supabase
+        .from('coach_profiles')
+        .upsert({ coach_id: userId, slug, display_name: 'My Coaching Practice' }, { onConflict: 'coach_id', ignoreDuplicates: true });
+    if (cpErr)
+        throw new Error(`ensureCoachProfile coach_profiles: ${cpErr.message}`);
+}
 async function upgradeToCoach(userId, slug, displayName) {
     await sdk_1.supabase.from('user_profiles').upsert({ user_id: userId, role: 'coach' });
     const { data, error } = await sdk_1.supabase

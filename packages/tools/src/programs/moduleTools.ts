@@ -167,6 +167,28 @@ export async function forkModule(originalModuleId: string, newCoachId: string): 
   return mapModule(newMod);
 }
 
+export async function updateModule(
+  moduleId: string,
+  patch: { title?: string; category?: string }
+): Promise<void> {
+  const update: Record<string, unknown> = {};
+  if (patch.title    !== undefined) update.title    = patch.title;
+  if (patch.category !== undefined) update.category = patch.category;
+  if (Object.keys(update).length === 0) return;
+  const { error } = await supabase.from('modules').update(update).eq('module_id', moduleId);
+  if (error) throw new Error(error.message);
+}
+
+export async function getAllModuleSections(moduleId: string): Promise<ModuleSectionSpec[]> {
+  const { data, error } = await supabase
+    .from('module_sections')
+    .select('*')
+    .eq('module_id', moduleId)
+    .order('section_order');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapSection);
+}
+
 function mapModule(row: Record<string, unknown>): ModuleRecord {
   return {
     moduleId:            row.module_id as string,

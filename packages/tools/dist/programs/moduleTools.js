@@ -8,6 +8,8 @@ exports.reorderSections = reorderSections;
 exports.publishModule = publishModule;
 exports.getModuleWithSections = getModuleWithSections;
 exports.forkModule = forkModule;
+exports.updateModule = updateModule;
+exports.getAllModuleSections = getAllModuleSections;
 const sdk_1 = require("@coaching/sdk");
 async function createModule(coachId, title, category, derivedFromId, sourceProgramId) {
     const { data, error } = await sdk_1.supabase
@@ -144,6 +146,28 @@ async function forkModule(originalModuleId, newCoachId) {
         await sdk_1.supabase.from('module_ancestry').insert(newAncestryRows);
     }
     return mapModule(newMod);
+}
+async function updateModule(moduleId, patch) {
+    const update = {};
+    if (patch.title !== undefined)
+        update.title = patch.title;
+    if (patch.category !== undefined)
+        update.category = patch.category;
+    if (Object.keys(update).length === 0)
+        return;
+    const { error } = await sdk_1.supabase.from('modules').update(update).eq('module_id', moduleId);
+    if (error)
+        throw new Error(error.message);
+}
+async function getAllModuleSections(moduleId) {
+    const { data, error } = await sdk_1.supabase
+        .from('module_sections')
+        .select('*')
+        .eq('module_id', moduleId)
+        .order('section_order');
+    if (error)
+        throw new Error(error.message);
+    return (data ?? []).map(mapSection);
 }
 function mapModule(row) {
     return {

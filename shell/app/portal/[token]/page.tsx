@@ -19,7 +19,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
     );
   }
 
-  const { enrollment: e, client, pkg } = enrollment;
+  const { client, pkg, ...e } = enrollment!;
 
   let sections: Awaited<ReturnType<typeof getModuleView>> = [];
   if (e.currentModuleId) {

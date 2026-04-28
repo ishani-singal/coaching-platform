@@ -7,4 +7,9 @@ export declare function reorderSections(moduleId: string, orderedSectionIds: str
 export declare function publishModule(moduleId: string): Promise<void>;
 export declare function getModuleWithSections(moduleId: string, viewType: ViewType): Promise<ModuleRecord>;
 export declare function forkModule(originalModuleId: string, newCoachId: string): Promise<ModuleRecord>;
+export declare function updateModule(moduleId: string, patch: {
+    title?: string;
+    category?: string;
+}): Promise<void>;
+export declare function getAllModuleSections(moduleId: string): Promise<ModuleSectionSpec[]>;
 //# sourceMappingURL=moduleTools.d.ts.map

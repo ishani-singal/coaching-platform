@@ -1,5 +1,5 @@
 import { createAgentServer, AgentManifest, ContextRequest, ActionRequest, PeriodType } from '@coaching/sdk';
-import { configureBridge, createProgramPeriod, listModulesForCoach, listProgramsForCoach, removeModuleFromProgram, getProgramWithPeriods } from '@coaching/tools';
+import { configureBridge, createProgramPeriod, listModulesForCoach, listProgramsForCoach, removeModuleFromProgram, getProgramWithPeriods, addSection, updateSection, deleteSection, updateModule, getAllModuleSections } from '@coaching/tools';
 import {
   scaffoldModule, addContentToSection, forkModule, previewModule,
 } from '@coaching/skills';
@@ -40,8 +40,16 @@ const manifest: AgentManifest = {
     // Existing actions
     { name: 'create_module',    description: 'Create a new standalone module',
       params: { title: { type: 'string', required: true, description: 'Module title' }, category: { type: 'string', required: true, description: 'Category' }, derivedFromModuleId: { type: 'string', required: false, description: 'Parent module ID' } } },
-    { name: 'add_section',     description: 'Add or update a content section on a module',
-      params: { moduleId: { type: 'string', required: true, description: '' }, contentType: { type: 'string', required: true, description: 'text|video|pdf|task|check_in|quiz|facilitation_guide' }, body: { type: 'object', required: true, description: '' }, visibleTo: { type: 'array', required: true, description: 'client|trainee|delivery' } } },
+    { name: 'add_section',     description: 'Add a new content section to a module',
+      params: { moduleId: { type: 'string', required: true, description: 'Module to add section to' }, order: { type: 'number', required: true, description: '0-based section order' }, contentType: { type: 'string', required: true, description: 'text|video|long_form_qa|single_choice|multi_choice|match_following|rating|assignment' }, body: { type: 'object', required: true, description: 'Section body' }, visibleTo: { type: 'array', required: true, description: 'client|trainee|delivery' } } },
+    { name: 'update_section',  description: 'Edit an existing section on a module',
+      params: { sectionId: { type: 'string', required: true, description: 'Section ID' }, contentType: { type: 'string', required: true, description: '' }, body: { type: 'object', required: true, description: '' }, visibleTo: { type: 'array', required: true, description: '' } } },
+    { name: 'delete_section',  description: 'Delete a section from a module',
+      params: { sectionId: { type: 'string', required: true, description: 'Section ID' } } },
+    { name: 'get_module_detail', description: 'Load all sections for a module (coach view, no visibility filter)',
+      params: { moduleId: { type: 'string', required: true, description: 'Module ID' } } },
+    { name: 'update_module',   description: 'Edit a module title or category',
+      params: { moduleId: { type: 'string', required: true, description: 'Module ID' }, title: { type: 'string', required: false, description: 'New title' }, category: { type: 'string', required: false, description: 'New category' } } },
     { name: 'fork_module',     description: 'Fork a licensed module',
       params: { moduleId: { type: 'string', required: true, description: '' } } },
     { name: 'build_program',   description: 'Build a flat program from existing modules',
@@ -150,9 +158,36 @@ async function onAction(req: ActionRequest) {
       return { success: true, message: 'Module created',
         data: await scaffoldModule(uid, p.title as string, p.category as string) as unknown as Record<string, unknown> };
 
-    case 'add_section':
-      await addContentToSection(p.sectionId as string, p.contentType as never, p.body as Record<string, unknown>, p.visibleTo as never);
+    case 'add_section': {
+      const sec = await addSection(
+        p.moduleId as string,
+        p.order as number ?? 0,
+        p.visibleTo as never,
+        p.contentType as never,
+        p.body as Record<string, unknown>
+      );
+      return { success: true, message: 'Section added', data: sec as unknown as Record<string, unknown> };
+    }
+
+    case 'update_section':
+      await updateSection(p.sectionId as string, {
+        contentType: p.contentType as never,
+        body:        p.body as Record<string, unknown>,
+        visibleTo:   p.visibleTo as never,
+      });
       return { success: true, message: 'Section updated' };
+
+    case 'delete_section':
+      await deleteSection(p.sectionId as string);
+      return { success: true, message: 'Section deleted' };
+
+    case 'get_module_detail':
+      return { success: true, message: 'Loaded',
+        data: { sections: await getAllModuleSections(p.moduleId as string) } };
+
+    case 'update_module':
+      await updateModule(p.moduleId as string, { title: p.title as string | undefined, category: p.category as string | undefined });
+      return { success: true, message: 'Module updated' };
 
     case 'fork_module':
       return { success: true, message: 'Module forked',

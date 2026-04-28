@@ -5,6 +5,7 @@ import { useSession } from '@/components/SessionProvider';
 type Snapshot = { version: number; tone: string; style: string; summary: string } | null;
 
 export default function PersonaPage() {
+  const { userId } = useSession();
   const [snapshot, setSnapshot] = useState<Snapshot>(null);
   const [building, setBuilding] = useState(false);
   const [sourceText, setSourceText] = useState('');
@@ -14,7 +15,7 @@ export default function PersonaPage() {
     return fetch('/api/agents/coaching-persona-chat/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action, params }),
+      body: JSON.stringify({ userId, config: {}, action, params }),
     }).then(r => r.json());
   }
 

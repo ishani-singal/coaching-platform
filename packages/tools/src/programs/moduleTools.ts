@@ -5,11 +5,18 @@ export async function createModule(
   coachId: string,
   title: string,
   category: string,
-  derivedFromId?: string
+  derivedFromId?: string,
+  sourceProgramId?: string
 ): Promise<ModuleRecord> {
   const { data, error } = await supabase
     .from('modules')
-    .insert({ creator_coach_id: coachId, title, category, derived_from_module_id: derivedFromId ?? null })
+    .insert({
+      creator_coach_id:       coachId,
+      title,
+      category,
+      derived_from_module_id: derivedFromId ?? null,
+      source_program_id:      sourceProgramId ?? null,
+    })
     .select()
     .single();
   if (error) throw new Error(error.message);
@@ -162,13 +169,14 @@ export async function forkModule(originalModuleId: string, newCoachId: string): 
 
 function mapModule(row: Record<string, unknown>): ModuleRecord {
   return {
-    moduleId:           row.module_id as string,
-    creatorCoachId:     row.creator_coach_id as string,
-    title:              row.title as string,
-    category:           (row.category ?? '') as string,
-    version:            row.version as number,
+    moduleId:            row.module_id as string,
+    creatorCoachId:      row.creator_coach_id as string,
+    title:               row.title as string,
+    category:            (row.category ?? '') as string,
+    version:             row.version as number,
     derivedFromModuleId: row.derived_from_module_id as string | undefined,
-    isPublished:        row.is_published as boolean,
+    sourceProgramId:     row.source_program_id as string | undefined,
+    isPublished:         row.is_published as boolean,
   };
 }
 

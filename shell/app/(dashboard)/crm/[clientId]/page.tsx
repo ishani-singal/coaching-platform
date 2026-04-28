@@ -11,6 +11,7 @@ type ClientDetail = {
 
 export default function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = use(params);
+  const { userId } = useSession();
   const [detail, setDetail] = useState<ClientDetail | null>(null);
   const [note, setNote] = useState('');
   const [tag, setTag] = useState('');
@@ -19,7 +20,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
     return fetch('/api/agents/coaching-crm/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action, params: p }),
+      body: JSON.stringify({ userId, config: {}, action, params: p }),
     }).then(r => r.json());
   }
 

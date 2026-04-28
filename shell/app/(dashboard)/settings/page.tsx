@@ -20,7 +20,7 @@ export default function SettingsPage() {
     const r = await fetch('/api/coaches/upgrade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', slug, displayName }),
+      body: JSON.stringify({ userId, slug, displayName }),
     }).then(r => r.json()) as { success: boolean; message?: string; data: { subdomainUrl: string } };
     setUpgradeStatus(r.success ? `✓ Coach profile created! URL: ${r.data?.subdomainUrl}` : `✗ Failed: ${r.message}`);
   }

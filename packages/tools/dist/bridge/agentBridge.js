@@ -21,7 +21,7 @@ async function callAgentAction(agentId, userId, action, params) {
             body: JSON.stringify({ userId, config: {}, action, params }),
         });
         if (!res.ok)
-            throw new Error(`Skillz agent ${agentId} action '${action}' failed: ${res.status}`);
+            throw new Error(`Agent ${agentId} action '${action}' failed: ${res.status}`);
         return res.json();
     }
     if (_mode.mode === 'direct') {
@@ -59,6 +59,6 @@ function resolveAgentUrl(agentId) {
     const url = process.env[envKey];
     if (url)
         return url;
-    throw new Error(`No URL configured for skillz agent '${agentId}'. Set ${envKey} in .env`);
+    throw new Error(`No URL configured for agent '${agentId}'. Set ${envKey} in .env`);
 }
 //# sourceMappingURL=agentBridge.js.map

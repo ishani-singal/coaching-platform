@@ -5,6 +5,7 @@ import { useSession } from '@/components/SessionProvider';
 type DashboardRow = { enrollmentId: string; clientName: string; packageTitle: string; enrollmentType: string; completedAt: string | null };
 
 export default function ClientsPage() {
+  const { userId } = useSession();
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [enrollForm, setEnrollForm] = useState({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client' });
   const [status, setStatus] = useState('');
@@ -13,7 +14,7 @@ export default function ClientsPage() {
     fetch('/api/agents/coaching-program-runner/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action: 'get_dashboard', params: {} }),
+      body: JSON.stringify({ userId, config: {}, action: 'get_dashboard', params: {} }),
     }).then(r => r.json()).then(d => setRows(d.data?.rows ?? []));
   }, []);
 
@@ -22,7 +23,7 @@ export default function ClientsPage() {
     const r = await fetch('/api/agents/coaching-program-runner/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action: 'enroll_client', params: enrollForm }),
+      body: JSON.stringify({ userId, config: {}, action: 'enroll_client', params: enrollForm }),
     }).then(r => r.json()) as { success: boolean; message: string; data: { portalUrl: string } };
     setStatus(r.success ? `✓ Enrolled — Portal: ${r.data?.portalUrl}` : `✗ ${r.message}`);
   }

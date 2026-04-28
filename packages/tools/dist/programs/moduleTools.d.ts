@@ -1,5 +1,5 @@
 import { ModuleRecord, ModuleSectionSpec, ViewType, ContentType } from '@coaching/sdk';
-export declare function createModule(coachId: string, title: string, category: string, derivedFromId?: string): Promise<ModuleRecord>;
+export declare function createModule(coachId: string, title: string, category: string, derivedFromId?: string, sourceProgramId?: string): Promise<ModuleRecord>;
 export declare function addSection(moduleId: string, order: number, visibleTo: ViewType[], contentType: ContentType, body: Record<string, unknown>): Promise<ModuleSectionSpec>;
 export declare function updateSection(sectionId: string, patch: Partial<ModuleSectionSpec>): Promise<void>;
 export declare function deleteSection(sectionId: string): Promise<void>;

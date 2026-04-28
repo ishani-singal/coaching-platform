@@ -2,10 +2,14 @@ import { ModuleRecord, ModuleSectionSpec, ViewType, ContentType } from '@coachin
 import { createModule, addSection, getModuleWithSections, forkModule as forkModuleTool } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
 
-export async function scaffoldModule(coachId: string, title: string, category: string): Promise<ModuleRecord> {
-  const mod = await createModule(coachId, title, category);
+export async function scaffoldModule(
+  coachId: string,
+  title: string,
+  category: string,
+  sourceProgramId?: string
+): Promise<ModuleRecord> {
+  const mod = await createModule(coachId, title, category, undefined, sourceProgramId);
 
-  // Create placeholder section for each view type
   await Promise.all([
     addSection(mod.moduleId, 0, ['client'],   'text', { content: '' }),
     addSection(mod.moduleId, 1, ['trainee'],  'text', { content: '' }),

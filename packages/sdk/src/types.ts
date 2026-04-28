@@ -102,7 +102,11 @@ export type BridgeMode =
 // ── Coaching domain types ────────────────────────────────────────────────────
 
 export type ViewType        = 'client' | 'trainee' | 'delivery';
-export type ContentType     = 'text' | 'video' | 'pdf' | 'task' | 'check_in' | 'quiz' | 'facilitation_guide';
+export type ContentType     =
+  | 'text' | 'video' | 'pdf' | 'task' | 'check_in' | 'quiz' | 'facilitation_guide'
+  | 'long_form_qa' | 'single_choice' | 'multi_choice' | 'match_following' | 'rating'
+  | 'assignment';
+export type PeriodType      = 'week' | 'day' | 'month' | 'quarter' | 'custom';
 export type LibraryItemType = 'youtube' | 'book' | 'article' | 'pdf' | 'podcast';
 export type EnrollmentType  = 'client' | 'trainee';
 export type PricingModel    = 'free' | 'one_time' | 'subscription';
@@ -158,8 +162,18 @@ export interface ModuleRecord {
   category: string;
   version: number;
   derivedFromModuleId?: string;
+  sourceProgramId?: string;
   isPublished: boolean;
   sections?: ModuleSectionSpec[];
+}
+
+export interface ProgramPeriod {
+  periodId: string;
+  programId: string;
+  periodOrder: number;
+  label: string;
+  periodType: PeriodType;
+  modules?: ModuleRecord[];
 }
 
 export interface ProgramRecord {
@@ -169,6 +183,17 @@ export interface ProgramRecord {
   description?: string;
   isPublished: boolean;
   modules?: ModuleRecord[];
+  periods?: ProgramPeriod[];
+}
+
+export interface CoachModuleClientData {
+  recordId: string;
+  coachId: string;
+  moduleId: string;
+  clientId: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CoachingPackage {

@@ -7,6 +7,7 @@ type Client = { clientId: string; name: string; email: string; tags: string[]; e
 type Overview = { active: Client[]; completed: Client[]; prospect: Client[] };
 
 export default function CRMPage() {
+  const { userId } = useSession();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'prospect'>('active');
   const [tagFilter, setTagFilter] = useState('');
@@ -15,7 +16,7 @@ export default function CRMPage() {
     const r = await fetch('/api/agents/coaching-crm/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action: 'get_client_list', params: {} }),
+      body: JSON.stringify({ userId, config: {}, action: 'get_client_list', params: {} }),
     }).then(r => r.json()) as { data: Overview };
     setOverview(r.data ?? { active: [], completed: [], prospect: [] });
   }

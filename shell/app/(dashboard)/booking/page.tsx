@@ -14,7 +14,7 @@ export default function BookingPage() {
     return fetch(`/api/skillz-agents/${agentId}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action, params }),
+      body: JSON.stringify({ userId, config: {}, action, params }),
     }).then(r => r.json());
   }
 

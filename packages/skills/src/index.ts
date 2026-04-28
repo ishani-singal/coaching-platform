@@ -8,3 +8,4 @@ export * from './personaRecommendationSkill';
 export * from './bookingSkill';
 export * from './crmSkill';
 export * from './coachLibrarySkill';
+export * from './clientModuleDataSkill';

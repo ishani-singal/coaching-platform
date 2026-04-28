@@ -9,10 +9,16 @@ exports.publishModule = publishModule;
 exports.getModuleWithSections = getModuleWithSections;
 exports.forkModule = forkModule;
 const sdk_1 = require("@coaching/sdk");
-async function createModule(coachId, title, category, derivedFromId) {
+async function createModule(coachId, title, category, derivedFromId, sourceProgramId) {
     const { data, error } = await sdk_1.supabase
         .from('modules')
-        .insert({ creator_coach_id: coachId, title, category, derived_from_module_id: derivedFromId ?? null })
+        .insert({
+        creator_coach_id: coachId,
+        title,
+        category,
+        derived_from_module_id: derivedFromId ?? null,
+        source_program_id: sourceProgramId ?? null,
+    })
         .select()
         .single();
     if (error)
@@ -147,6 +153,7 @@ function mapModule(row) {
         category: (row.category ?? ''),
         version: row.version,
         derivedFromModuleId: row.derived_from_module_id,
+        sourceProgramId: row.source_program_id,
         isPublished: row.is_published,
     };
 }

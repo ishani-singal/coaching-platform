@@ -24,6 +24,7 @@ __exportStar(require("./persona/recommendationTools"), exports);
 __exportStar(require("./programs/moduleTools"), exports);
 __exportStar(require("./programs/programTools"), exports);
 __exportStar(require("./programs/packageTools"), exports);
+__exportStar(require("./programs/clientModuleDataTools"), exports);
 __exportStar(require("./programs/enrollmentTools"), exports);
 __exportStar(require("./licensing/licenseTools"), exports);
 __exportStar(require("./crm/clientProfileTools"), exports);

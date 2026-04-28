@@ -5,6 +5,7 @@ import { useSession } from '@/components/SessionProvider';
 type LibraryItem = { itemId: string; itemType: string; title: string; url?: string; thumbnailUrl?: string; tags: string[] };
 
 export default function LibraryPage() {
+  const { userId } = useSession();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [channelUrl, setChannelUrl] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -14,7 +15,7 @@ export default function LibraryPage() {
     const r = await fetch('/api/agents/coaching-coach-library/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action: 'get_library', params: {} }),
+      body: JSON.stringify({ userId, config: {}, action: 'get_library', params: {} }),
     }).then(r => r.json()) as { data: { items: LibraryItem[] } };
     setItems(r.data?.items ?? []);
   }
@@ -27,7 +28,7 @@ export default function LibraryPage() {
     const r = await fetch('/api/agents/coaching-coach-library/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'demo-user-id', config: {}, action: 'sync_youtube', params: { channelUrl } }),
+      body: JSON.stringify({ userId, config: {}, action: 'sync_youtube', params: { channelUrl } }),
     }).then(r => r.json()) as { data: { added: number; updated: number } };
     setSyncStatus(`Added: ${r.data?.added}, Updated: ${r.data?.updated}`);
     setSyncing(false);

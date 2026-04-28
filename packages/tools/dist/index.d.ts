@@ -8,6 +8,7 @@ export * from './persona/recommendationTools';
 export * from './programs/moduleTools';
 export * from './programs/programTools';
 export * from './programs/packageTools';
+export * from './programs/clientModuleDataTools';
 export * from './programs/enrollmentTools';
 export * from './licensing/licenseTools';
 export * from './crm/clientProfileTools';

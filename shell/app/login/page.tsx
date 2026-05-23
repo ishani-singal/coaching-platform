@@ -26,7 +26,21 @@ export default function LoginPage() {
     const supabase = createClient();
 
     if (mode === 'signin') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      let { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      // Supabase returns 400 "Email not confirmed" for accounts created before
+      // SMTP was configured. Auto-confirm via admin API and retry sign-in once.
+      if (error && (error.message.toLowerCase().includes('email not confirmed') || (error as { code?: string }).code === 'email_not_confirmed')) {
+        const confirmRes = await fetch('/api/auth/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (confirmRes.ok) {
+          ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+        }
+      }
+
       if (error) {
         setError(error.message);
         setLoading(false);

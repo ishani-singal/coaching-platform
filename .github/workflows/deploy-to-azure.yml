@@ -201,3 +201,25 @@ jobs:
             --name coaching-platform-prod-shell \
             --resource-group ${{ env.RESOURCE_GROUP }}
 
+      - name: Set agent URLs on App Service
+        run: |
+          set -e
+          CONTAINER_APPS=(coachprod-01 coachprod-02 coachprod-03 coachprod-04 coachprod-05 coachprod-06 coachprod-07)
+          ENV_KEYS=(AGENT_PROGRAM_BUILDER_URL AGENT_PROGRAM_RUNNER_URL AGENT_COACH_LIBRARY_URL AGENT_PERSONA_CHAT_URL AGENT_CRM_URL AGENT_LICENSING_URL AGENT_PAYMENT_URL)
+          SETTINGS=()
+          for i in "${!CONTAINER_APPS[@]}"; do
+            fqdn=$(az containerapp show \
+              --name "${CONTAINER_APPS[$i]}" \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || echo "")
+            if [ -n "$fqdn" ]; then
+              SETTINGS+=("${ENV_KEYS[$i]}=https://${fqdn}")
+            fi
+          done
+          if [ ${#SETTINGS[@]} -gt 0 ]; then
+            az webapp config appsettings set \
+              --name coaching-platform-prod-shell \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --settings "${SETTINGS[@]}"
+          fi
+

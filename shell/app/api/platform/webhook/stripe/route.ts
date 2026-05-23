@@ -14,6 +14,8 @@ function getStripe(): Stripe {
 const service = () =>
   createServiceClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
+type Supa = ReturnType<typeof service>;
+
 /**
  * POST /api/platform/webhook/stripe
  * Handles:
@@ -74,7 +76,7 @@ export async function POST(req: NextRequest) {
 // ────────────────────────────────────────────────────────────────────────────
 
 async function handleChatUnlock(
-  sb: ReturnType<typeof createServiceClient>,
+  sb: Supa,
   session: Stripe.Checkout.Session,
   metadata: Record<string, string>,
 ) {
@@ -166,7 +168,7 @@ async function handleChatUnlock(
 }
 
 async function handleSubscriptionUpdate(
-  sb: ReturnType<typeof createServiceClient>,
+  sb: Supa,
   sub: Stripe.Subscription,
 ) {
   const customerId = sub.customer as string;
@@ -216,7 +218,7 @@ async function handleSubscriptionUpdate(
 }
 
 async function handleSubscriptionCancelled(
-  sb: ReturnType<typeof createServiceClient>,
+  sb: Supa,
   sub: Stripe.Subscription,
 ) {
   const customerId = sub.customer as string;

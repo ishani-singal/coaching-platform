@@ -1,14 +1,14 @@
 'use client';
-import { useEffect } from 'react';
+import { use, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function ChatUnlockResultPage({ params }: { params: { slug: string } }) {
+export default function ChatUnlockResultPage({ params }: { params: Promise<{ slug: string }> }) {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const success      = searchParams.get('success') === 'true';
   const cancelled    = searchParams.get('cancelled') === 'true';
-  const { slug }     = params;
+  const { slug }     = use(params);
 
   useEffect(() => {
     if (success) {

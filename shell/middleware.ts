@@ -31,7 +31,7 @@ export async function middleware(req: NextRequest) {
   if (req.method === 'POST' && CHAT_ROUTE_RE.test(url.pathname)) {
     // x-forwarded-for may contain a comma-separated list; take the first (client) IP
     const forwarded = req.headers.get('x-forwarded-for');
-    const ip        = (forwarded ? forwarded.split(',')[0] : req.ip ?? '127.0.0.1').trim();
+    const ip        = (forwarded ? forwarded.split(',')[0] : '127.0.0.1').trim();
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { error: 'Too many requests — please wait a moment and try again.' },

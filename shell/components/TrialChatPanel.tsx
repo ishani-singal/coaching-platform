@@ -212,7 +212,7 @@ export default function TrialChatPanel() {
     setInput('');
     setStreaming(true);
 
-    const userMsg: Message = { id: genId(), role: 'user', content: userText, cards: [], pending: false };
+    const userMsg: Message = { id: genId(), role: 'user', content: userText, thinking: '', cards: [], pending: false };
     setMessages(prev => [...prev, userMsg]);
 
     const asstId = genId();

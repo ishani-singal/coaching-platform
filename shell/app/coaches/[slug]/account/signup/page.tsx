@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
@@ -11,8 +11,8 @@ function getSupabase() {
   );
 }
 
-export default function ProspectSignupPage({ params }: { params: { slug: string } }) {
-  const { slug }     = params;
+export default function ProspectSignupPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug }     = use(params);
   const router       = useRouter();
   const searchParams = useSearchParams();
   const redirectTo   = searchParams.get('redirect') ?? `/coaches/${slug}`;

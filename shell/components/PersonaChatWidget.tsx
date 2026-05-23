@@ -366,7 +366,7 @@ export default function PersonaChatWidget({
             {limitType === 'cost' ? 'Free chat limit reached' : "You've used your free messages"}
           </h3>
           <p className="text-xs text-gray-600 mb-4">
-            {session?.chatSettings && session.limits.paidChatPriceUsd != null
+            {session?.paidChatEnabled && session.limits.paidChatPriceUsd != null
               ? `To keep chatting, book a session or unlock unlimited chat for $${session.limits.paidChatPriceUsd.toFixed(2)}.`
               : 'To keep chatting, book a session with this coach.'}
           </p>

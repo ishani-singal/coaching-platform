@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
@@ -11,8 +11,8 @@ function getSupabase() {
   );
 }
 
-export default function ProspectAccountPage({ params }: { params: { slug: string } }) {
-  const { slug }     = params;
+export default function ProspectAccountPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug }     = use(params);
   const router       = useRouter();
   const searchParams = useSearchParams();
   const welcome      = searchParams.get('welcome') === 'true';

@@ -17,7 +17,7 @@ interface Props {
 
 const NAV_LABELS: Record<NavItem, string> = {
   home: 'Home', services: 'Services', events: 'Events', about: 'About',
-  blog: 'Blog', faq: 'FAQ', contact: 'Contact', search: 'Search',
+  blog: 'Blog', faq: 'FAQ', contact: 'Contact', search: 'Search', library: 'Library',
 };
 
 // ── Drag / Resize state held in refs (no re-render during move) ────────────────

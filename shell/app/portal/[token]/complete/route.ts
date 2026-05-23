@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const { sectionId, responseData } = await req.json() as { sectionId: string; responseData?: Record<string, unknown> };
 
     const enrollment = await getEnrollmentByToken(token);
-    const flags = await completeSection(enrollment.enrollmentId, sectionId, responseData);
+    const flags = await completeSection(enrollment.clientId, sectionId, responseData);
     return NextResponse.json({ success: true, ...flags });
   } catch (e: unknown) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 400 });

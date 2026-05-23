@@ -21,7 +21,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
     );
   }
 
-  const { client, pkg, ...e } = enrollment!;
+  const { pkg, ...e } = enrollment!;
 
   // Gate: paid packages require a completed payment before granting portal access
   if (pkg.priceUsd && pkg.priceUsd > 0) {

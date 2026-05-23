@@ -35,15 +35,26 @@ export default function LoginPage() {
         router.refresh();
       }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
+      // Use server-side signup (service role key) so email confirmation is not required.
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) {
+        setError(json.error ?? 'Signup failed.');
         setLoading(false);
       } else {
-        setInfo('Check your email to confirm your account, then sign in.');
-        setMode('signin');
-        setPassword('');
-        setLoading(false);
+        // Account created — sign in immediately.
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          setError(signInError.message);
+          setLoading(false);
+        } else {
+          router.push('/programs');
+          router.refresh();
+        }
       }
     }
   }

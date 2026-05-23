@@ -6,11 +6,14 @@
     "packages/sdk",
     "packages/tools",
     "packages/skills",
-    "packages/agents/*"
+    "packages/agents/*",
+    "packages/stripe-webhooks",
+    "shell"
   ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "kill": "npx kill-port 3000 3001 3002 3003 3004 3005 3006 3007 3008 && node -e \"require('fs').rmSync('shell/.next/trace',{force:true})\"",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"

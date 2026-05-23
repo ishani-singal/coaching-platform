@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "nodemon --exec \"ts-node -r dotenv/config src/index.ts\"",
+    "dev": "nodemon --ext ts,js,json --watch src --watch node_modules/@coaching/tools/dist --watch node_modules/@coaching/skills/dist --watch node_modules/@coaching/sdk/dist --exec \"ts-node -r dotenv/config src/index.ts\"",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },

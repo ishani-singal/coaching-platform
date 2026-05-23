@@ -7,6 +7,7 @@ const AGENT_PORTS: Record<string, number> = {
   'coaching-persona-chat':    3004,
   'coaching-crm':             3005,
   'coaching-licensing':       3006,
+  'coaching-payment':         3007,
 };
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

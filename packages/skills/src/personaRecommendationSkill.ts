@@ -1,37 +1,20 @@
 import { ClientProfile, PersonaRecommendation } from '@coaching/sdk';
 import {
   getLatestPersonaSnapshot,
-  getLibraryByCoach,
-  getPublishedPackagesForCoach,
-  scoreLibraryItemsForClient,
-  scorePackagesForClient,
-  formatRecommendationInPersona,
   streamChatInPersona,
-  toPersonaRecommendations,
+  semanticRecommendations,
 } from '@coaching/tools';
 
 export async function getRecommendations(
   coachId: string,
   clientProfile: ClientProfile,
-  query: string
+  query: string,
+  citedItemIds?: string[]
 ): Promise<PersonaRecommendation[]> {
-  const [snapshot, library, packages] = await Promise.all([
-    getLatestPersonaSnapshot(coachId),
-    getLibraryByCoach(coachId),
-    getPublishedPackagesForCoach(coachId),
-  ]);
-
+  const snapshot = await getLatestPersonaSnapshot(coachId);
   if (!snapshot) return [];
 
-  const scoredItems    = scoreLibraryItemsForClient(library, clientProfile);
-  const scoredPackages = scorePackagesForClient(packages, clientProfile);
-
-  const top = [...scoredItems, ...scoredPackages]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
-
-  await formatRecommendationInPersona(top, snapshot, query);
-  return toPersonaRecommendations(top);
+  return semanticRecommendations(coachId, clientProfile, query, undefined, citedItemIds);
 }
 
 export async function* streamPersonaChat(

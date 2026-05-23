@@ -5,5 +5,4 @@ export declare function getClientProfile(clientId: string): Promise<ClientProfil
 export declare function getClientByInviteToken(token: string): Promise<ClientProfile>;
 export declare function getClientsByCoach(coachId: string): Promise<ClientProfile[]>;
 export declare function updateClientProfile(clientId: string, patch: Partial<ClientProfile>): Promise<void>;
-export declare function linkClientToEnrollment(clientId: string, enrollmentId: string): Promise<void>;
 //# sourceMappingURL=clientProfileTools.d.ts.map

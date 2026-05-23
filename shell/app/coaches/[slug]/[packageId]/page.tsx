@@ -6,7 +6,7 @@ configureBridge({ mode: 'http', authToken: process.env.SKILLZ_AGENT_AUTH_TOKEN }
 export default async function PackagePage({ params }: { params: Promise<{ slug: string; packageId: string }> }) {
   const { slug, packageId } = await params;
   const coach = await getCoachBySlug(slug);
-  const packages = await getPublishedPackagesForCoach(coach.coachId);
+  const packages = await getPublishedPackagesForCoach(coach.userId);
   const pkg = packages.find(p => p.packageId === packageId);
 
   if (!pkg) return <div className="p-8 text-gray-400">Package not found.</div>;

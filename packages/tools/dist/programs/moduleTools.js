@@ -4,14 +4,15 @@ exports.createModule = createModule;
 exports.addSection = addSection;
 exports.updateSection = updateSection;
 exports.deleteSection = deleteSection;
+exports.deleteModule = deleteModule;
 exports.reorderSections = reorderSections;
-exports.publishModule = publishModule;
 exports.getModuleWithSections = getModuleWithSections;
 exports.forkModule = forkModule;
 exports.updateModule = updateModule;
 exports.getAllModuleSections = getAllModuleSections;
+exports.pruneEmptySections = pruneEmptySections;
 const sdk_1 = require("@coaching/sdk");
-async function createModule(coachId, title, category, derivedFromId, sourceProgramId) {
+async function createModule(coachId, title, category, derivedFromId) {
     const { data, error } = await sdk_1.supabase
         .from('modules')
         .insert({
@@ -19,7 +20,6 @@ async function createModule(coachId, title, category, derivedFromId, sourceProgr
         title,
         category,
         derived_from_module_id: derivedFromId ?? null,
-        source_program_id: sourceProgramId ?? null,
     })
         .select()
         .single();
@@ -27,54 +27,70 @@ async function createModule(coachId, title, category, derivedFromId, sourceProgr
         throw new Error(error.message);
     return mapModule(data);
 }
-async function addSection(moduleId, order, visibleTo, contentType, body) {
-    const { data, error } = await sdk_1.supabase
-        .from('module_sections')
-        .insert({ module_id: moduleId, section_order: order, visible_to: visibleTo, content_type: contentType, body })
-        .select()
-        .single();
+async function addSection(moduleId, order, contentType, body) {
+    const { data, error } = await sdk_1.supabase.rpc('append_module_section', {
+        p_module_id: moduleId,
+        p_section_order: order,
+        p_content_type: contentType,
+        p_body: body,
+    });
     if (error)
         throw new Error(error.message);
     return mapSection(data);
 }
-async function updateSection(sectionId, patch) {
-    const update = {};
-    if (patch.visibleTo)
-        update.visible_to = patch.visibleTo;
-    if (patch.contentType)
-        update.content_type = patch.contentType;
-    if (patch.body)
-        update.body = patch.body;
-    if (patch.sectionOrder !== undefined)
-        update.section_order = patch.sectionOrder;
-    await sdk_1.supabase.from('module_sections').update(update).eq('section_id', sectionId);
+async function updateSection(moduleId, sectionId, patch) {
+    const { error } = await sdk_1.supabase.rpc('update_module_section', {
+        p_module_id: moduleId,
+        p_section_id: sectionId,
+        p_content_type: patch.contentType ?? null,
+        p_body: patch.body ?? null,
+        p_section_order: patch.sectionOrder ?? null,
+    });
+    if (error)
+        throw new Error(error.message);
 }
-async function deleteSection(sectionId) {
-    await sdk_1.supabase.from('module_sections').delete().eq('section_id', sectionId);
+async function deleteSection(moduleId, sectionId) {
+    const { error } = await sdk_1.supabase.rpc('delete_module_section', {
+        p_module_id: moduleId,
+        p_section_id: sectionId,
+    });
+    if (error)
+        throw new Error(error.message);
+}
+async function deleteModule(moduleId, coachId) {
+    // Remove all FK dependents first (none of these have ON DELETE CASCADE)
+    await sdk_1.supabase.from('program_modules').delete().eq('module_id', moduleId);
+    await sdk_1.supabase.from('module_licenses').delete().eq('module_id', moduleId);
+    await sdk_1.supabase.from('module_ancestry').delete().or(`module_id.eq.${moduleId},ancestor_module_id.eq.${moduleId}`);
+    // Null out any module that was derived from this one
+    await sdk_1.supabase.from('modules').update({ derived_from_module_id: null }).eq('derived_from_module_id', moduleId);
+    // Null out enrollment tracking pointer on any clients at this module
+    await sdk_1.supabase.from('client_profiles').update({ current_module_id: null }).eq('current_module_id', moduleId);
+    const { error } = await sdk_1.supabase.from('modules').delete()
+        .eq('module_id', moduleId)
+        .eq('creator_coach_id', coachId);
+    if (error)
+        throw new Error(error.message);
 }
 async function reorderSections(moduleId, orderedSectionIds) {
-    await Promise.all(orderedSectionIds.map((id, idx) => sdk_1.supabase.from('module_sections').update({ section_order: idx }).eq('section_id', id).eq('module_id', moduleId)));
+    const { error } = await sdk_1.supabase.rpc('reorder_module_sections', {
+        p_module_id: moduleId,
+        p_ordered_ids: orderedSectionIds,
+    });
+    if (error)
+        throw new Error(error.message);
 }
-async function publishModule(moduleId) {
-    await sdk_1.supabase.from('modules').update({ is_published: true }).eq('module_id', moduleId);
-}
-async function getModuleWithSections(moduleId, viewType) {
-    const { data: mod, error } = await sdk_1.supabase
+async function getModuleWithSections(moduleId) {
+    const { data, error } = await sdk_1.supabase
         .from('modules')
         .select('*')
         .eq('module_id', moduleId)
         .single();
     if (error)
         throw new Error(error.message);
-    const { data: sections } = await sdk_1.supabase
-        .from('module_sections')
-        .select('*')
-        .eq('module_id', moduleId)
-        .contains('visible_to', [viewType])
-        .order('section_order');
-    return { ...mapModule(mod), sections: (sections ?? []).map(mapSection) };
+    return mapModule(data);
 }
-async function forkModule(originalModuleId, newCoachId) {
+async function forkModule(originalModuleId, newCoachId, opts) {
     const { data: orig, error: e1 } = await sdk_1.supabase
         .from('modules')
         .select('*')
@@ -82,6 +98,10 @@ async function forkModule(originalModuleId, newCoachId) {
         .single();
     if (e1)
         throw new Error(e1.message);
+    // Guard: no_sublicense modules cannot be forked by a different coach
+    if (orig.no_sublicense && newCoachId !== orig.creator_coach_id) {
+        throw new Error('This module cannot be forked');
+    }
     const { data: newMod, error: e2 } = await sdk_1.supabase
         .from('modules')
         .insert({
@@ -89,24 +109,13 @@ async function forkModule(originalModuleId, newCoachId) {
         title: orig.title,
         category: orig.category,
         derived_from_module_id: originalModuleId,
+        sections: orig.sections,
+        no_sublicense: opts?.noSublicense ?? false,
     })
         .select()
         .single();
     if (e2)
         throw new Error(e2.message);
-    const { data: sections } = await sdk_1.supabase
-        .from('module_sections')
-        .select('*')
-        .eq('module_id', originalModuleId);
-    if (sections && sections.length > 0) {
-        await sdk_1.supabase.from('module_sections').insert(sections.map((s) => ({
-            module_id: newMod.module_id,
-            section_order: s.section_order,
-            visible_to: s.visible_to,
-            content_type: s.content_type,
-            body: s.body,
-        })));
-    }
     // Load existing ancestry for the original module
     const { data: ancestry } = await sdk_1.supabase
         .from('module_ancestry')
@@ -161,13 +170,61 @@ async function updateModule(moduleId, patch) {
 }
 async function getAllModuleSections(moduleId) {
     const { data, error } = await sdk_1.supabase
-        .from('module_sections')
-        .select('*')
+        .from('modules')
+        .select('sections')
         .eq('module_id', moduleId)
-        .order('section_order');
+        .single();
     if (error)
         throw new Error(error.message);
-    return (data ?? []).map(mapSection);
+    const mapped = (data?.sections ?? []).map(mapSection);
+    const seen = new Set();
+    return mapped.filter(s => {
+        if (seen.has(s.sectionId))
+            return false;
+        seen.add(s.sectionId);
+        return true;
+    });
+}
+function isSectionNonEmpty(contentType, body) {
+    switch (contentType) {
+        case 'text':
+        case 'facilitation_guide':
+            return typeof body.content === 'string' && body.content.trim() !== '';
+        case 'video':
+            return typeof body.embedUrl === 'string' && body.embedUrl.trim() !== '';
+        case 'pdf':
+            return typeof body.url === 'string' && body.url.trim() !== '';
+        case 'task':
+            return Array.isArray(body.items) && body.items.length > 0;
+        case 'check_in':
+        case 'rating':
+            return typeof body.prompt === 'string' && body.prompt.trim() !== '';
+        case 'quiz':
+            return Array.isArray(body.questions) && body.questions.length > 0;
+        case 'long_form_qa':
+        case 'single_choice':
+        case 'multi_choice':
+            return typeof body.question === 'string' && body.question.trim() !== '';
+        case 'match_following':
+            return Array.isArray(body.pairs) && body.pairs.length > 0;
+        case 'assignment':
+            return [
+                body.title, body.instructions,
+            ].some(v => typeof v === 'string' && v.trim() !== '');
+        default:
+            return Object.values(body).some(v => v !== null && v !== undefined && v !== '');
+    }
+}
+async function pruneEmptySections(moduleId) {
+    const sections = await getAllModuleSections(moduleId);
+    if (sections.length === 0)
+        return;
+    const emptyIds = sections
+        .filter(s => !isSectionNonEmpty(s.contentType, s.body))
+        .map(s => s.sectionId);
+    if (emptyIds.length === 0)
+        return;
+    await Promise.all(emptyIds.map(id => deleteSection(moduleId, id)));
 }
 function mapModule(row) {
     return {
@@ -177,15 +234,14 @@ function mapModule(row) {
         category: (row.category ?? ''),
         version: row.version,
         derivedFromModuleId: row.derived_from_module_id,
-        sourceProgramId: row.source_program_id,
-        isPublished: row.is_published,
+        noSublicense: row.no_sublicense ?? false,
+        sections: (row.sections ?? []).map(mapSection),
     };
 }
 function mapSection(row) {
     return {
         sectionId: row.section_id,
         sectionOrder: row.section_order,
-        visibleTo: row.visible_to,
         contentType: row.content_type,
         body: row.body,
     };

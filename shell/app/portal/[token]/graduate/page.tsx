@@ -15,13 +15,14 @@ export default function GraduatePage({ params }: { params: Promise<{ token: stri
 
   async function graduate(e: React.FormEvent) {
     e.preventDefault();
-    // Get userId from enrollment token
-    const enrollment = await fetch(`/api/portal/${token}`).then(r => r.json()) as { data: { enrollment: { installingCoachId: string } } };
+    // Get userId and includedProgramIds from enrollment token
+    const enrollment = await fetch(`/api/portal/${token}`).then(r => r.json()) as { data: { enrollment: { installingCoachId: string }; pkg: { includedProgramIds?: string[] } } };
     const userId = enrollment.data?.enrollment?.installingCoachId ?? '';
+    const includedProgramIds = enrollment.data?.pkg?.includedProgramIds;
     const r = await fetch('/api/coaches/upgrade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, slug, displayName }),
+      body: JSON.stringify({ userId, slug, displayName, includedProgramIds }),
     }).then(r => r.json()) as { success: boolean; data: { subdomainUrl: string } };
     setResult(r.success ? `🎉 Welcome, Coach! Your site: ${r.data?.subdomainUrl}` : '✗ Failed');
   }

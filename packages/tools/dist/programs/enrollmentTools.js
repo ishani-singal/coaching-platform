@@ -10,52 +10,60 @@ exports.getCoachEnrollmentStats = getCoachEnrollmentStats;
 const sdk_1 = require("@coaching/sdk");
 async function createEnrollment(packageId, coachId, clientId, type) {
     const { data, error } = await sdk_1.supabase
-        .from('enrollments')
-        .insert({ package_id: packageId, installing_coach_id: coachId, client_id: clientId, enrollment_type: type })
+        .from('client_profiles')
+        .update({ package_id: packageId, enrollment_type: type })
+        .eq('client_id', clientId)
+        .eq('coach_id', coachId)
         .select()
         .single();
     if (error)
         throw new Error(error.message);
-    return mapEnrollment(data);
+    return mapClient(data);
 }
 async function getEnrollmentByToken(token) {
     const { data, error } = await sdk_1.supabase
-        .from('enrollments')
-        .select('*, client_profiles(*), coaching_packages(*)')
+        .from('client_profiles')
+        .select('*, packages(*)')
         .eq('invite_token', token)
         .single();
     if (error)
-        throw new Error('Enrollment not found');
+        throw new Error('Client not found');
     return {
-        ...mapEnrollment(data),
-        client: mapClient(data.client_profiles),
-        pkg: mapPackage(data.coaching_packages),
+        ...mapClient(data),
+        pkg: mapPackage(data.packages),
     };
 }
-async function getEnrollmentWithProgress(enrollmentId) {
-    const { data: enrollment } = await sdk_1.supabase
-        .from('enrollments')
+async function getEnrollmentWithProgress(clientId) {
+    const { data: client } = await sdk_1.supabase
+        .from('client_profiles')
         .select('*')
-        .eq('enrollment_id', enrollmentId)
+        .eq('client_id', clientId)
         .single();
-    const { data: responses } = await sdk_1.supabase
-        .from('enrollment_responses')
-        .select('section_id, response_data, submitted_at')
-        .eq('enrollment_id', enrollmentId);
-    const completedSectionIds = (responses ?? []).map((r) => r.section_id);
-    return { enrollment: mapEnrollment(enrollment), completedSectionIds, responses: responses ?? [] };
+    const responses = (client?.responses ?? []);
+    const completedSectionIds = responses.map(r => r.section_id);
+    return { enrollment: mapClient(client), completedSectionIds, responses };
 }
-async function submitResponse(enrollmentId, sectionId, responseData) {
-    await sdk_1.supabase.from('enrollment_responses').insert({ enrollment_id: enrollmentId, section_id: sectionId, response_data: responseData });
+async function submitResponse(clientId, sectionId, responseData) {
+    const { error } = await sdk_1.supabase.rpc('append_enrollment_response', {
+        p_client_id: clientId,
+        p_section_id: sectionId,
+        p_response_data: responseData,
+    });
+    if (error)
+        throw new Error(error.message);
 }
-async function advanceCurrentModule(enrollmentId, nextModuleId) {
-    await sdk_1.supabase.from('enrollments').update({ current_module_id: nextModuleId }).eq('enrollment_id', enrollmentId);
+async function advanceCurrentModule(clientId, nextModuleId) {
+    await sdk_1.supabase.from('client_profiles').update({ current_module_id: nextModuleId }).eq('client_id', clientId);
 }
-async function completeEnrollment(enrollmentId) {
-    await sdk_1.supabase.from('enrollments').update({ completed_at: new Date().toISOString() }).eq('enrollment_id', enrollmentId);
+async function completeEnrollment(clientId) {
+    await sdk_1.supabase.from('client_profiles').update({ completed_at: new Date().toISOString() }).eq('client_id', clientId);
 }
 async function getCoachEnrollmentStats(coachId, packageId) {
-    let q = sdk_1.supabase.from('enrollments').select('enrollment_id, completed_at, current_module_id').eq('installing_coach_id', coachId);
+    let q = sdk_1.supabase
+        .from('client_profiles')
+        .select('client_id, completed_at, current_module_id')
+        .eq('coach_id', coachId)
+        .not('enrollment_type', 'is', null);
     if (packageId)
         q = q.eq('package_id', packageId);
     const { data } = await q;
@@ -70,39 +78,42 @@ async function getCoachEnrollmentStats(coachId, packageId) {
         avgModuleReached: 0,
     };
 }
-function mapEnrollment(row) {
-    return {
-        enrollmentId: row.enrollment_id,
-        packageId: row.package_id,
-        installingCoachId: row.installing_coach_id,
-        clientId: row.client_id,
-        enrollmentType: row.enrollment_type,
-        inviteToken: row.invite_token,
-        startedAt: row.started_at,
-        completedAt: row.completed_at,
-        currentModuleId: row.current_module_id,
-    };
-}
 function mapClient(row) {
+    const rawResponses = (row.responses ?? []);
     return {
         clientId: row.client_id,
         coachId: row.coach_id,
+        inviteToken: row.invite_token,
+        userId: row.user_id,
         name: row.name,
         email: row.email,
+        phone: row.phone,
         goals: (row.goals ?? ''),
         background: (row.background ?? ''),
         preferences: (row.preferences ?? {}),
+        packageId: row.package_id,
+        enrollmentType: row.enrollment_type,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        currentModuleId: row.current_module_id,
+        responses: rawResponses.map(r => ({
+            sectionId: r.section_id,
+            responseData: (r.response_data ?? {}),
+            submittedAt: r.submitted_at,
+        })),
     };
 }
 function mapPackage(row) {
     return {
         packageId: row.package_id,
         coachId: row.coach_id,
-        personaSnapshotId: row.persona_snapshot_id,
         title: row.title,
         pricingModel: row.pricing_model,
         priceUsd: row.price_usd,
+        currencies: row.currencies ?? ['INR'],
+        showSeatsFilled: row.show_seats_filled ?? false,
         isPublished: row.is_published,
+        includedProgramIds: row.included_program_ids ?? [],
     };
 }
 //# sourceMappingURL=enrollmentTools.js.map

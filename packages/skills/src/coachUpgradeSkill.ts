@@ -1,38 +1,29 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getLLMClient } from '@coaching/tools';
 import { CoachProfile } from '@coaching/sdk';
-import { upgradeToCoach as upgradeCoachTool, checkSlugAvailable, addPersonaSource, savePersonaSnapshot, setPersonaSnapshot } from '@coaching/tools';
+import { upgradeToCoach as upgradeCoachTool, checkSlugAvailable, savePersonaSnapshot, setPersonaSnapshot, getProgramWithPeriods, createProgram, createProgramPeriod, addModuleToPeriodByOrder, forkModule as forkModuleTool } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
 
 export async function upgradeToCoach(
   userId: string,
   slug: string,
-  displayName: string
+  displayName: string,
+  includedProgramIds?: string[]
 ): Promise<{ coachProfile: CoachProfile; subdomainUrl: string }> {
   const coachProfile = await upgradeCoachTool(userId, slug, displayName);
 
   // Seed an empty draft package
-  await supabase.from('coaching_packages').insert({
+  await supabase.from('packages').insert({
     coach_id:      userId,
     title:         'My First Package',
     pricing_model: 'free',
     is_published:  false,
   });
 
-  // Add a welcome persona source
-  const source = await addPersonaSource(
-    userId,
-    'text',
-    `I am ${displayName}, a coach passionate about helping people reach their goals.`
-  );
-
-  // Build initial persona snapshot via LLM
-  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genai.getGenerativeModel({
-    model: 'gemini-2.5-flash-preview-04-17',
-    systemInstruction: 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }',
-  });
-  const result = await model.generateContent(source.content ?? '');
-  const rawText = result.response.text().trim().replace(/^```json\s*|```$/g, '');
+  // Build initial persona snapshot from display name
+  const introText = `I am ${displayName}, a coach passionate about helping people reach their goals.`;
+  const llm = getLLMClient();
+  const systemInstruction = 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }';
+  const rawText = (await llm.generateText(systemInstruction, introText)).trim().replace(/^```json\s*|```$/g, '');
 
   let tone = 'encouraging', style = 'conversational', summary = `I am ${displayName}.`;
   try {
@@ -45,8 +36,39 @@ export async function upgradeToCoach(
   const snapshot = await savePersonaSnapshot(userId, tone, style, summary, {});
   await setPersonaSnapshot(userId, snapshot.id);
 
+  if (includedProgramIds && includedProgramIds.length > 0) {
+    for (const programId of includedProgramIds) {
+      await forkProgramForNewCoach(programId, userId);
+    }
+  }
+
   const subdomainUrl = `https://${slug}.${process.env.PLATFORM_DOMAIN}`;
   return { coachProfile: { ...coachProfile, personaSnapshotId: snapshot.id }, subdomainUrl };
 }
 
 export { checkSlugAvailable };
+
+async function forkProgramForNewCoach(originalProgramId: string, newCoachId: string): Promise<void> {
+  const orig = await getProgramWithPeriods(originalProgramId);
+  const newProg = await createProgram(newCoachId, orig.title, orig.description);
+
+  if (orig.periods && orig.periods.length > 0) {
+    for (let pi = 0; pi < orig.periods.length; pi++) {
+      const period = orig.periods[pi];
+      await createProgramPeriod(newProg.programId, pi, period.label, period.periodType);
+      const mods = period.modules ?? [];
+      for (let mi = 0; mi < mods.length; mi++) {
+        const forked = await forkModuleTool(mods[mi].moduleId, newCoachId, { noSublicense: true });
+        await addModuleToPeriodByOrder(newProg.programId, pi, forked.moduleId, mi);
+      }
+    }
+  } else {
+    // No periods — create implicit period and add forked modules
+    await createProgramPeriod(newProg.programId, 0, '', 'custom');
+    const mods = orig.modules ?? [];
+    for (let mi = 0; mi < mods.length; mi++) {
+      const forked = await forkModuleTool(mods[mi].moduleId, newCoachId, { noSublicense: true });
+      await addModuleToPeriodByOrder(newProg.programId, 0, forked.moduleId, mi);
+    }
+  }
+}

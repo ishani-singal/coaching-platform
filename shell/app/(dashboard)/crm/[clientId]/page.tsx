@@ -2,11 +2,23 @@
 import { useState, useEffect, use } from 'react';
 import { useSession } from '@/components/SessionProvider';
 
+type Enrollment = {
+  enrollmentId:     string;
+  packageTitle:     string;
+  enrollmentType:   string;
+  completedAt:      string | null;
+  startedAt:        string | null;
+  totalSections:    number;
+  completedSections: number;
+  completionPct:    number;
+};
+
 type ClientDetail = {
   profile: { name: string; email: string; goals: string; background: string };
   notes: { note_id: string; note: string; created_at: string }[];
   tags: string[];
   sessions: { sessionId: string; scheduledAt: string; status: string }[];
+  enrollments: Enrollment[];
 };
 
 export default function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
@@ -46,7 +58,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
   }
 
   if (!detail) return <div className="p-8 text-gray-400">Loading…</div>;
-  const { profile, notes, tags, sessions } = detail;
+  const { profile, notes, tags, sessions, enrollments } = detail;
 
   return (
     <div>
@@ -77,6 +89,36 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
                 </div>
               ))}
               {notes.length === 0 && <p className="text-gray-400 text-sm">No notes yet.</p>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="font-semibold mb-3">Programs ({enrollments?.length ?? 0})</h2>
+            <div className="space-y-4">
+              {(enrollments ?? []).map(e => (
+                <div key={e.enrollmentId} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="font-medium text-sm">{e.packageTitle}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 capitalize">{e.enrollmentType}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${e.completedAt ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+                      {e.completedAt ? 'Completed' : 'Active'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="progress-fill bg-indigo-600 h-full rounded-full"
+                        style={{ '--progress-w': `${e.completionPct}%` } as React.CSSProperties}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-gray-600 w-10 text-right">{e.completionPct}%</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{e.completedSections} / {e.totalSections} sections</p>
+                </div>
+              ))}
+              {(enrollments ?? []).length === 0 && <p className="text-gray-400 text-sm">Not enrolled in any programs.</p>}
             </div>
           </div>
 

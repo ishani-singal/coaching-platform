@@ -1,0 +1,11 @@
+{
+  "name": "@coaching/stripe-webhooks",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node dev.js"
+  },
+  "dependencies": {
+    "@ngrok/ngrok": "^1.4.0"
+  }
+}

@@ -1,17 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { ThemeToggle } from './ThemeToggle';
+import { ModelPicker } from './ModelPicker';
 
 const LEFT_NAV = [
-  { href: '/',          label: 'Home' },
-  { href: '/programs',  label: 'Programs' },
-  { href: '/clients',   label: 'Clients' },
-  { href: '/library',   label: 'Library' },
-  { href: '/persona',   label: 'Chat' },
-  { href: '/booking',   label: 'Booking' },
-  { href: '/licensing', label: 'Licensing' },
-  { href: '/crm',       label: 'CRM' },
+  { href: '/programs?tab=packages', label: 'Packages' },
+  { href: '/programs?tab=programs', label: 'Programs' },
+  { href: '/library',               label: 'Library'  },
+  { href: '/persona',               label: 'Chat'     },
+  { href: '/booking',               label: 'Booking'  },
+  { href: '/crm',                   label: 'CRM'      },
+  { href: '/website',               label: 'Website'  },
 ];
 
 interface NavbarProps {
@@ -20,32 +21,40 @@ interface NavbarProps {
 
 export function Navbar({ email }: NavbarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+  const isActive = (href: string) => {
+    if (href.includes('?')) {
+      const [hrefPath, hrefQuery] = href.split('?');
+      if (pathname !== hrefPath) return false;
+      const tab = new URLSearchParams(hrefQuery).get('tab');
+      const currentTab = searchParams.get('tab') ?? 'packages';
+      return currentTab === tab;
+    }
+    return href === '/' ? pathname === '/' : pathname.startsWith(href);
+  };
 
   const linkClass = (href: string) =>
     `text-sm font-medium px-3 py-1.5 rounded-md transition-all duration-150 ${
       isActive(href)
         ? 'bg-indigo-600 text-white shadow-sm'
-        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+        : 'theme-nav-link'
     }`;
 
-  // Get initials from email for the avatar
   const initials = email ? email[0].toUpperCase() : '?';
 
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 text-white h-16 flex items-center px-6 shrink-0 shadow-lg">
+    <nav className="theme-nav border-b h-16 flex items-center px-6 shrink-0 shadow-lg">
       {/* Brand */}
       <Link href="/" className="flex items-center gap-2.5 mr-8 shrink-0 group">
         <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-bold text-white group-hover:bg-indigo-500 transition-colors">
           S
         </div>
-        <span className="text-sm font-semibold text-white tracking-wide">Skillz</span>
+        <span className="text-sm font-semibold theme-nav-brand tracking-wide">Skillz</span>
       </Link>
 
       {/* Divider */}
-      <div className="w-px h-5 bg-gray-700 mr-6 shrink-0" />
+      <div className="w-px h-5 theme-nav-divider mr-6 shrink-0" />
 
       {/* Left-aligned nav links */}
       <div className="flex items-center gap-0.5 flex-1">
@@ -56,32 +65,38 @@ export function Navbar({ email }: NavbarProps) {
         ))}
       </div>
 
-      {/* Right-aligned: Settings + user */}
+      {/* Right-aligned: Settings + theme toggle + user */}
       <div className="flex items-center gap-1 ml-4 shrink-0">
-        <Link href="/settings" className={linkClass('/settings')}>
-          Settings
+        <ModelPicker />
+
+        <Link
+          href="/settings"
+          title="Settings"
+          className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
+            isActive('/settings') ? 'bg-indigo-600 text-white' : 'theme-nav-link'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
         </Link>
 
-        {/* Divider */}
-        <div className="w-px h-5 bg-gray-700 mx-3 shrink-0" />
+        <ThemeToggle />
 
         {/* User section */}
         <div className="flex items-center gap-2.5">
-          <div
-            title={email}
-            className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-xs font-semibold text-white shrink-0"
-          >
-            {initials}
-          </div>
-          <span className="text-xs text-gray-400 hidden lg:block max-w-[160px] truncate">
-            {email}
-          </span>
           <form action="/api/auth/signout" method="POST">
             <button
               type="submit"
-              className="text-xs text-gray-500 hover:text-gray-200 transition-colors ml-1 border border-gray-700 hover:border-gray-500 rounded px-2 py-1"
+              title="Sign out"
+              className="w-7 h-7 flex items-center justify-center rounded-md theme-nav-link transition-colors"
             >
-              Sign out
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
             </button>
           </form>
         </div>

@@ -4,7 +4,6 @@ import { CoachingSession, SessionStatus } from '@coaching/sdk';
 export async function recordSession(
   coachId: string,
   clientId: string,
-  enrollmentId: string | null,
   bookingRef: string,
   paymentRef: string | null,
   scheduledAt: Date,
@@ -15,7 +14,6 @@ export async function recordSession(
     .insert({
       coach_id:         coachId,
       client_id:        clientId,
-      enrollment_id:    enrollmentId,
       booking_ref:      bookingRef,
       payment_ref:      paymentRef,
       scheduled_at:     scheduledAt.toISOString(),
@@ -56,7 +54,6 @@ function mapSession(row: Record<string, unknown>): CoachingSession {
     sessionId:       row.session_id as string,
     coachId:         row.coach_id as string,
     clientId:        row.client_id as string,
-    enrollmentId:    row.enrollment_id as string | undefined,
     bookingRef:      row.booking_ref as string | undefined,
     paymentRef:      row.payment_ref as string | undefined,
     scheduledAt:     row.scheduled_at as string,

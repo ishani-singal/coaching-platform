@@ -31,7 +31,7 @@ const manifest: AgentManifest = {
           { key: 'client_name',   label: 'Client',   type: 'text' },
           { key: 'package_title', label: 'Package',  type: 'text' },
           { key: 'enrolled_at',   label: 'Enrolled', type: 'date' },
-          { key: 'enrollment_id', label: 'Nudge',    type: 'action-button', actionName: 'send_nudge' },
+          { key: 'client_id',     label: 'Nudge',    type: 'action-button', actionName: 'send_nudge' },
         ],
       },
       { type: 'action-form', id: 'pr-enroll', title: 'Enroll Client', action: 'enroll_client', submitLabel: 'Enroll',
@@ -45,25 +45,27 @@ const manifest: AgentManifest = {
     ],
   },
   actions: [
-    { name: 'enroll_client',       description: 'Enroll a client in a package',     params: { packageId: { type: 'string', required: true, description: '' }, clientName: { type: 'string', required: true, description: '' }, clientEmail: { type: 'string', required: true, description: '' }, clientPhone: { type: 'string', required: false, description: '' }, goals: { type: 'string', required: false, description: '' }, background: { type: 'string', required: false, description: '' }, enrollmentType: { type: 'string', required: true, description: 'client | trainee', enum: ['client', 'trainee'] } } },
+    { name: 'enroll_client',       description: 'Enroll a client in a package',     params: { packageId: { type: 'string', required: true, description: '' }, clientName: { type: 'string', required: true, description: '' }, clientEmail: { type: 'string', required: true, description: '' }, clientPhone: { type: 'string', required: false, description: '' }, goals: { type: 'string', required: false, description: '' }, background: { type: 'string', required: false, description: '' }, enrollmentType: { type: 'string', required: true, description: 'client | trainee', enum: ['client', 'trainee'] }, customPrice: { type: 'number', required: false, description: 'Override price in USD for this specific client (overrides package default)' }, discountAmount: { type: 'number', required: false, description: 'Flat discount in USD to subtract from the effective price for this client' } } },
     { name: 'get_dashboard',       description: 'Get coach enrollment dashboard',   params: {} },
-    { name: 'get_client_progress', description: 'Get enrollment progress',          params: { enrollmentId: { type: 'string', required: true, description: '' } } },
-    { name: 'complete_section',    description: 'Mark a section as complete',       params: { enrollmentId: { type: 'string', required: true, description: '' }, sectionId: { type: 'string', required: true, description: '' }, responseData: { type: 'object', required: false, description: '' } } },
-    { name: 'send_nudge',          description: 'Send nudge email to client',       params: { enrollmentId: { type: 'string', required: true, description: '' }, message: { type: 'string', required: false, description: '' } } },
+    { name: 'get_client_progress', description: 'Get enrollment progress',          params: { clientId: { type: 'string', required: true, description: '' } } },
+    { name: 'complete_section',    description: 'Mark a section as complete',       params: { clientId: { type: 'string', required: true, description: '' }, sectionId: { type: 'string', required: true, description: '' }, responseData: { type: 'object', required: false, description: '' } } },
+    { name: 'send_nudge',          description: 'Send nudge email to client',       params: { clientId: { type: 'string', required: true, description: '' }, message: { type: 'string', required: false, description: '' } } },
     { name: 'get_analytics',       description: 'Get enrollment analytics',         params: { packageId: { type: 'string', required: false, description: '' } } },
-    { name: 'graduate_trainee',    description: 'Graduate a trainee to coach',      params: { enrollmentId: { type: 'string', required: true, description: '' } } },
+    { name: 'graduate_trainee',    description: 'Graduate a trainee to coach',      params: { clientId: { type: 'string', required: true, description: '' } } },
+    { name: 'resend_invite',       description: 'Resend the invite email for a client', params: { clientId: { type: 'string', required: true, description: '' } } },
   ],
 };
 
 async function onContext(req: ContextRequest) {
   const userId = req.userId;
-  const { data: enrollments } = await supabase
-    .from('enrollments')
-    .select('enrollment_id, completed_at, enrolled_at, client_id, client_profiles(name), coaching_packages(title)')
-    .eq('installing_coach_id', userId);
+  const { data: clients } = await supabase
+    .from('client_profiles')
+    .select('client_id, completed_at, created_at, name, packages(title)')
+    .eq('coach_id', userId)
+    .not('enrollment_type', 'is', null);
 
-  const active    = (enrollments ?? []).filter((e: Record<string, unknown>) => !e.completed_at).length;
-  const total     = (enrollments ?? []).length;
+  const active = (clients ?? []).filter((e: Record<string, unknown>) => !e.completed_at).length;
+  const total  = (clients ?? []).length;
 
   return {
     snapshot: {
@@ -75,13 +77,13 @@ async function onContext(req: ContextRequest) {
       recentEvents: [],
       pendingActions: [],
       rawContext: {
-        enrollments: (enrollments ?? [])
+        enrollments: (clients ?? [])
           .filter((e: Record<string, unknown>) => !e.completed_at)
           .map((e: Record<string, unknown>) => ({
-            enrollment_id: e.enrollment_id,
-            client_name:   (e.client_profiles as Record<string, unknown> | null)?.name ?? 'Unknown',
-            package_title: (e.coaching_packages as Record<string, unknown> | null)?.title ?? '—',
-            enrolled_at:   e.enrolled_at,
+            client_id:     e.client_id,
+            client_name:   e.name ?? 'Unknown',
+            package_title: (e.packages as Record<string, unknown> | null)?.title ?? '—',
+            enrolled_at:   e.created_at,
           })),
       },
     },
@@ -94,13 +96,15 @@ async function onAction(req: ActionRequest) {
 
   switch (req.action) {
     case 'enroll_client': {
+      const customPrice    = p.customPrice    != null ? Number(p.customPrice)    : undefined;
+      const discountAmount = p.discountAmount != null ? Number(p.discountAmount) : undefined;
       const result = await enrollClient(p.packageId as string, uid, {
         name: p.clientName as string,
         email: p.clientEmail as string,
         phone: p.clientPhone as string | undefined,
         goals: p.goals as string | undefined,
         background: p.background as string | undefined,
-      }, p.enrollmentType as 'client' | 'trainee');
+      }, p.enrollmentType as 'client' | 'trainee', { customPriceUsd: customPrice, discountAmountUsd: discountAmount });
       return { success: true, message: 'Client enrolled', data: result as unknown as Record<string, unknown> };
     }
 
@@ -108,26 +112,25 @@ async function onAction(req: ActionRequest) {
       return { success: true, message: 'Dashboard', data: { rows: await getCoachDashboard(uid) } };
 
     case 'get_client_progress':
-      return { success: true, message: 'Progress', data: await getEnrollmentWithProgress(p.enrollmentId as string) as unknown as Record<string, unknown> };
+      return { success: true, message: 'Progress', data: await getEnrollmentWithProgress(p.clientId as string) as unknown as Record<string, unknown> };
 
     case 'complete_section': {
-      const flags = await completeSection(p.enrollmentId as string, p.sectionId as string, p.responseData as Record<string, unknown> | undefined);
+      const flags = await completeSection(p.clientId as string, p.sectionId as string, p.responseData as Record<string, unknown> | undefined);
       return { success: true, message: 'Section completed', data: flags };
     }
 
     case 'send_nudge': {
-      const { data: enrollment } = await supabase
-        .from('enrollments')
-        .select('invite_token, client_profiles(email, name), coaching_packages(title)')
-        .eq('enrollment_id', p.enrollmentId)
+      const { data: client } = await supabase
+        .from('client_profiles')
+        .select('invite_token, email, name, packages(title)')
+        .eq('client_id', p.clientId)
         .single();
-      const client = enrollment?.client_profiles as unknown as Record<string, unknown>;
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from:    process.env.FROM_EMAIL ?? 'noreply@coachplatform.com',
         to:      client?.email as string,
-        subject: `Your next module in ${(enrollment?.coaching_packages as unknown as Record<string, unknown>)?.title} is ready`,
-        html:    `<p>Hi ${client?.name}, ${p.message ?? 'Keep going — your next module awaits!'}</p><a href="https://${process.env.PLATFORM_DOMAIN}/portal/${enrollment?.invite_token}">Continue learning</a>`,
+        subject: `Your next module in ${(client?.packages as unknown as Record<string, unknown>)?.title} is ready`,
+        html:    `<p>Hi ${client?.name}, ${p.message ?? 'Keep going — your next module awaits!'}</p><a href="https://${process.env.PLATFORM_DOMAIN}/portal/${client?.invite_token}">Continue learning</a>`,
       });
       return { success: true, message: 'Nudge sent' };
     }
@@ -136,8 +139,30 @@ async function onAction(req: ActionRequest) {
       return { success: true, message: 'Analytics', data: await getCoachEnrollmentStats(uid, p.packageId as string | undefined) as unknown as Record<string, unknown> };
 
     case 'graduate_trainee': {
-      await completeEnrollment(p.enrollmentId as string);
+      await completeEnrollment(p.clientId as string);
       return { success: true, message: 'Trainee graduated' };
+    }
+
+    case 'resend_invite': {
+      const { data: client } = await supabase
+        .from('client_profiles')
+        .select('invite_token, email, name, packages(title)')
+        .eq('client_id', p.clientId)
+        .single();
+      if (!client) return { success: false, message: 'Client not found' };
+      const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+      const protocol = domain.startsWith('localhost') ? 'http' : 'https';
+      const portalUrl = `${protocol}://${domain}/portal/${client.invite_token}`;
+      if (process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from:    process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
+          to:      client.email as string,
+          subject: `Your invite to ${(client.packages as unknown as Record<string, unknown>)?.title ?? 'a coaching program'}`,
+          html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
+        });
+      }
+      return { success: true, message: 'Invite resent', data: { portalUrl } };
     }
 
     default:

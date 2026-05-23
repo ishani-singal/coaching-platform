@@ -6,6 +6,7 @@ const skills_1 = require("@coaching/skills");
 const skills_2 = require("@coaching/skills");
 const tools_2 = require("@coaching/tools");
 const sdk_2 = require("@coaching/sdk");
+const resend_1 = require("resend");
 const PORT = parseInt(process.env.AGENT_CRM_PORT ?? '3005', 10);
 const AGENT_ID = 'coaching-crm';
 (0, tools_1.configureBridge)({ mode: 'http', authToken: process.env.SKILLZ_AGENT_AUTH_TOKEN });
@@ -58,6 +59,8 @@ const manifest = {
         { name: 'update_client', description: 'Update client profile', params: { clientId: { type: 'string', required: true, description: '' }, patch: { type: 'object', required: true, description: '' } } },
         { name: 'get_sessions', description: 'Get session history', params: { clientId: { type: 'string', required: false, description: '' } } },
         { name: 'sync_bookings', description: 'Sync bookings to sessions', params: {} },
+        { name: 'get_dashboard_stats', description: 'Get CRM dashboard stats', params: {} },
+        { name: 'resend_invite', description: 'Resend enrollment invite email to a client', params: { clientId: { type: 'string', required: true, description: '' } } },
     ],
 };
 async function onContext(req) {
@@ -113,6 +116,30 @@ async function onAction(req) {
         case 'sync_bookings':
             await (0, skills_2.syncBookingsToSessions)(uid, uid);
             return { success: true, message: 'Bookings synced' };
+        case 'get_dashboard_stats':
+            return { success: true, message: 'Dashboard stats', data: await (0, skills_1.getDashboardStats)(uid) };
+        case 'resend_invite': {
+            const { data: client } = await sdk_2.supabase
+                .from('client_profiles')
+                .select('invite_token, email, name, packages(title)')
+                .eq('client_id', p.clientId)
+                .single();
+            if (!client)
+                return { success: false, message: 'Client not found' };
+            const domain = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+            const protocol = domain.startsWith('localhost') ? 'http' : 'https';
+            const portalUrl = `${protocol}://${domain}/portal/${client.invite_token}`;
+            if (process.env.RESEND_API_KEY) {
+                const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
+                await resend.emails.send({
+                    from: process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
+                    to: client.email,
+                    subject: `Your invite to ${client.packages?.title ?? 'a coaching program'}`,
+                    html: `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
+                });
+            }
+            return { success: true, message: 'Invite resent', data: { portalUrl } };
+        }
         default:
             return { success: false, message: `Unknown action: ${req.action}` };
     }

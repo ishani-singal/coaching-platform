@@ -66,5 +66,6 @@ function mapClient(row: Record<string, unknown>): ClientProfile {
     goals:       (row.goals ?? '') as string,
     background:  (row.background ?? '') as string,
     preferences: (row.preferences ?? {}) as ClientProfile['preferences'],
+    responses:   (row.responses as ClientProfile['responses']) ?? [],
   };
 }

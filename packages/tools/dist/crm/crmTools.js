@@ -66,6 +66,7 @@ function mapClient(row) {
         goals: (row.goals ?? ''),
         background: (row.background ?? ''),
         preferences: (row.preferences ?? {}),
+        responses: row.responses ?? [],
     };
 }
 //# sourceMappingURL=crmTools.js.map

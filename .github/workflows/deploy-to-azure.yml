@@ -1,0 +1,114 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+  RESOURCE_GROUP: coaching-platform-prod-rg
+  LOCATION: centralus
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get ACR credentials
+        run: |
+          ACR_USERNAME=$(az acr credential show --name $(echo $REGISTRY | cut -d. -f1) --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name $(echo $REGISTRY | cut -d. -f1) --query "passwords[0].value" -o tsv)
+          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to ACR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.ACR_USERNAME }}
+          password: ${{ env.ACR_PASSWORD }}
+
+      - name: Build and push agent images
+        run: |
+          for agent in 01-program-builder 02-program-runner 03-coach-library 04-persona-chat 05-crm 06-licensing 07-payment; do
+            docker build \
+              -t ${{ env.REGISTRY }}/agents/$agent:latest \
+              --build-arg AGENT_NAME=$agent \
+              -f Dockerfile.agent \
+              .
+            docker push ${{ env.REGISTRY }}/agents/$agent:latest
+          done
+
+      - name: Build and push shell image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/shell:latest -f shell/Dockerfile .
+          docker push ${{ env.REGISTRY }}/shell:latest
+
+      - name: Deploy Shell to App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: coaching-platform-prod-shell
+          images: ${{ env.REGISTRY }}/shell:latest
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+
+      - name: Update Container Apps with new images
+        run: |
+          az containerapp update \
+            --name coachprod-01 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/01-program-builder:latest
+          
+          az containerapp update \
+            --name coachprod-02 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/02-program-runner:latest
+          
+          az containerapp update \
+            --name coachprod-03 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/03-coach-library:latest
+          
+          az containerapp update \
+            --name coachprod-04 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/04-persona-chat:latest
+          
+          az containerapp update \
+            --name coachprod-05 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/05-crm:latest
+          
+          az containerapp update \
+            --name coachprod-06 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/06-licensing:latest
+          
+          az containerapp update \
+            --name coachprod-07 \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/agents/07-payment:latest

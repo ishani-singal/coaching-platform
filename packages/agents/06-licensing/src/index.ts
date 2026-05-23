@@ -1,6 +1,6 @@
 import { createAgentServer, AgentManifest, ContextRequest, ActionRequest } from '@coaching/sdk';
 import { configureBridge, revokeModuleLicense, getAncestryChain, getRevenueByCoach } from '@coaching/tools';
-import { licenseModuleToCoach, getLicenseDashboard } from '@coaching/skills';
+import { licenseModuleToCoach, getLicenseDashboard, sendLicenseInvitation, activateProgramLicense, getPendingLicenseByToken } from '@coaching/skills';
 import { supabase } from '@coaching/sdk';
 
 const PORT = parseInt(process.env.AGENT_LICENSING_PORT ?? '3006', 10);
@@ -48,12 +48,15 @@ const manifest: AgentManifest = {
     ],
   },
   actions: [
-    { name: 'get_license_dashboard',  description: 'Get licensing overview',        params: {} },
-    { name: 'grant_license',          description: 'Grant module license',          params: { moduleId: { type: 'string', required: true, description: '' }, licenseeCoachId: { type: 'string', required: true, description: '' }, directCutPct: { type: 'number', required: true, description: '' }, derivativeCutPct: { type: 'number', required: true, description: '' }, propagateToDepth: { type: 'number', required: false, description: '' }, canSublicense: { type: 'boolean', required: false, description: '' } } },
-    { name: 'revoke_license',         description: 'Revoke a module license',      params: { licenseId: { type: 'string', required: true, description: '' } } },
-    { name: 'get_revenue_breakdown',  description: 'Get revenue breakdown',         params: { since: { type: 'string', required: false, description: '' }, groupBy: { type: 'string', required: false, description: '' } } },
-    { name: 'get_ancestry',           description: 'Get module ancestry chain',     params: { moduleId: { type: 'string', required: true, description: '' } } },
-    { name: 'update_license_depth',   description: 'Update license propagation',   params: { licenseId: { type: 'string', required: true, description: '' }, propagateToDepth: { type: 'number', required: true, description: '' } } },
+    { name: 'get_license_dashboard',    description: 'Get licensing overview',            params: {} },
+    { name: 'grant_license',            description: 'Grant module license',              params: { moduleId: { type: 'string', required: true, description: '' }, licenseeCoachId: { type: 'string', required: true, description: '' }, directCutPct: { type: 'number', required: true, description: '' }, derivativeCutPct: { type: 'number', required: true, description: '' }, propagateToDepth: { type: 'number', required: false, description: '' }, canSublicense: { type: 'boolean', required: false, description: '' } } },
+    { name: 'send_license_invitation',  description: 'Send program license invitation by email', params: { programId: { type: 'string', required: true, description: '' }, licenseeEmail: { type: 'string', required: true, description: '' }, licenseFeeAmount: { type: 'number', required: true, description: '' }, licenseFeeCurrency: { type: 'string', required: true, description: '' } } },
+    { name: 'get_pending_license',      description: 'Get pending license by invite token', params: { inviteToken: { type: 'string', required: true, description: '' } } },
+    { name: 'activate_license',         description: 'Activate a pending program license',  params: { licenseId: { type: 'string', required: true, description: '' } } },
+    { name: 'revoke_license',           description: 'Revoke a module license',            params: { licenseId: { type: 'string', required: true, description: '' } } },
+    { name: 'get_revenue_breakdown',    description: 'Get revenue breakdown',              params: { since: { type: 'string', required: false, description: '' }, groupBy: { type: 'string', required: false, description: '' } } },
+    { name: 'get_ancestry',             description: 'Get module ancestry chain',          params: { moduleId: { type: 'string', required: true, description: '' } } },
+    { name: 'update_license_depth',     description: 'Update license propagation',        params: { licenseId: { type: 'string', required: true, description: '' }, propagateToDepth: { type: 'number', required: true, description: '' } } },
   ],
 };
 
@@ -118,6 +121,27 @@ async function onAction(req: ActionRequest) {
         canSublicense:    (p.canSublicense as boolean) ?? false,
       });
       return { success: true, message: 'License granted' };
+
+    case 'send_license_invitation': {
+      const result = await sendLicenseInvitation(uid, {
+        programId:          p.programId as string,
+        licenseeEmail:      p.licenseeEmail as string,
+        licenseFeeAmount:   (p.licenseFeeAmount as number) ?? 0,
+        licenseFeeCurrency: (p.licenseFeeCurrency as string) ?? 'USD',
+      });
+      return { success: true, message: 'Invitation sent', data: result as unknown as Record<string, unknown> };
+    }
+
+    case 'get_pending_license': {
+      const license = await getPendingLicenseByToken(p.inviteToken as string);
+      if (!license) return { success: false, message: 'Invite not found or already used' };
+      return { success: true, message: 'License found', data: license };
+    }
+
+    case 'activate_license': {
+      await activateProgramLicense(p.licenseId as string);
+      return { success: true, message: 'License activated — program forked to your account' };
+    }
 
     case 'revoke_license':
       await revokeModuleLicense(p.licenseId as string);

@@ -4,9 +4,41 @@ import { createClient } from '@supabase/supabase-js';
 
 const DOMAIN = process.env.PLATFORM_DOMAIN!;
 
+// ── In-memory rate limiter (per-IP, no Redis required) ────────────────────
+// Limits POST /api/coaches/*/chat to 60 requests per minute per IP.
+const RATE_LIMIT_MAX      = 60;
+const RATE_LIMIT_WINDOW   = 60_000; // 1 minute in ms
+const ipCounters          = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now    = Date.now();
+  const record = ipCounters.get(ip);
+  if (!record || now >= record.resetAt) {
+    ipCounters.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return false;
+  }
+  record.count += 1;
+  return record.count > RATE_LIMIT_MAX;
+}
+
+const CHAT_ROUTE_RE = /^\/api\/coaches\/[^/]+\/chat$/;
+
 export async function middleware(req: NextRequest) {
   const host = req.headers.get('host') ?? '';
   const url  = req.nextUrl.clone();
+
+  // ── Rate-limit POST /api/coaches/*/chat ─────────────────────────────────
+  if (req.method === 'POST' && CHAT_ROUTE_RE.test(url.pathname)) {
+    // x-forwarded-for may contain a comma-separated list; take the first (client) IP
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip        = (forwarded ? forwarded.split(',')[0] : req.ip ?? '127.0.0.1').trim();
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Too many requests — please wait a moment and try again.' },
+        { status: 429, headers: { 'Retry-After': '60' } },
+      );
+    }
+  }
 
   // Subdomain: john.coachplatform.com → /coaches/john
   const sub = host.match(new RegExp(`^([a-z0-9-]+)\\.${DOMAIN.replace(/\./g, '\\.')}$`));
@@ -15,10 +47,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // Custom domain → look up slug in coach_profiles
+  // Custom domain → look up slug in user_profiles
   if (DOMAIN && !host.endsWith(DOMAIN) && !host.startsWith('localhost')) {
     const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-    const { data } = await sb.from('coach_profiles').select('slug').eq('custom_domain', host).single();
+    const { data } = await sb.from('user_profiles').select('slug').eq('custom_domain', host).single();
     if (data) {
       url.pathname = `/coaches/${data.slug}${url.pathname === '/' ? '' : url.pathname}`;
       return NextResponse.rewrite(url);
@@ -27,6 +59,7 @@ export async function middleware(req: NextRequest) {
 
   // Auth: refresh session + protect dashboard routes
   const isDashboard =
+    url.pathname !== '/' &&
     !url.pathname.startsWith('/login') &&
     !url.pathname.startsWith('/coaches') &&
     !url.pathname.startsWith('/portal') &&

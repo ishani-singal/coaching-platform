@@ -29,3 +29,8 @@ services:
     build: ./packages/agents/06-licensing
     ports: ['3006:3000']
     env_file: .env
+
+  payment:
+    build: ./packages/agents/07-payment
+    ports: ['3007:3000']
+    env_file: .env

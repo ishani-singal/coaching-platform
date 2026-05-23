@@ -20,7 +20,11 @@ export function createAgentServer(
 ): Express {
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }));
 
   app.get('/health',   (_req, res) => res.json({ status: 'ok', agentId: manifest.agentId }));
   app.get('/manifest', (_req, res) => res.json(manifest));
@@ -32,7 +36,11 @@ export function createAgentServer(
 
   app.post('/action', requireShellToken, async (req, res) => {
     try   { res.json(await handlers.action(req.body)); }
-    catch (e: unknown) { res.status(500).json({ success: false, message: (e as Error).message }); }
+    catch (e: unknown) {
+      const msg = (e as Error).message ?? JSON.stringify(e);
+      console.error('[agent] action error:', msg);
+      res.status(500).json({ success: false, message: msg });
+    }
   });
 
   return app;

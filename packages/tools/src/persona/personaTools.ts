@@ -1,32 +1,53 @@
 import { supabase } from '@coaching/sdk';
-import { PersonaSnapshot, PersonaSource } from '@coaching/sdk';
+import { PersonaSnapshot } from '@coaching/sdk';
+import { extractPdfText } from '../embeddings/pdfTools';
+import { upsertLibraryChunks } from '../embeddings/pineconeTools';
 
-export async function addPersonaSource(
-  coachId: string,
-  sourceType: PersonaSource['sourceType'],
-  content?: string,
-  url?: string
-): Promise<PersonaSource> {
-  const { data, error } = await supabase
-    .from('persona_sources')
-    .insert({ coach_id: coachId, source_type: sourceType, content, url })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return mapSource(data);
+export interface PersonaContext {
+  corpus: string;
+  libraryItemCount: number;
 }
 
-export async function removePersonaSource(sourceId: string): Promise<void> {
-  await supabase.from('persona_sources').delete().eq('id', sourceId);
-}
+/** Build a text corpus from user_profiles + coach_library_items for LLM persona extraction. */
+export async function buildPersonaContext(coachId: string): Promise<PersonaContext> {
+  const [profileResult, libraryResult] = await Promise.all([
+    supabase
+      .from('user_profiles')
+      .select('display_name, bio, coaching_type, social_media')
+      .eq('user_id', coachId)
+      .single(),
+    supabase
+      .from('coach_library_items')
+      .select('item_type, title, description, tags')
+      .eq('coach_id', coachId)
+      .order('display_order'),
+  ]);
 
-export async function getPersonaSources(coachId: string): Promise<PersonaSource[]> {
-  const { data } = await supabase
-    .from('persona_sources')
-    .select('*')
-    .eq('coach_id', coachId)
-    .order('created_at', { ascending: false });
-  return (data ?? []).map(mapSource);
+  const profile = profileResult.data;
+  const items   = libraryResult.data ?? [];
+
+  const lines: string[] = [];
+
+  if (profile) {
+    lines.push(`Coach: ${profile.display_name as string}`);
+    if (profile.coaching_type) lines.push(`Coaching specialty: ${(profile.coaching_type as string).replace(/_/g, ' ')}`);
+    if (profile.bio)           lines.push(`Bio: ${profile.bio as string}`);
+
+    const social = (profile.social_media ?? {}) as Record<string, string>;
+    if (social.linkedin)  lines.push(`LinkedIn: ${social.linkedin}`);
+    if (social.instagram) lines.push(`Instagram: ${social.instagram}`);
+  }
+
+  if (items.length > 0) {
+    lines.push('\nLibrary:');
+    for (const item of items) {
+      const tags = ((item.tags as string[]) ?? []).join(', ');
+      const desc = (item.description as string | null) ?? '';
+      lines.push(`[${item.item_type as string}] ${item.title as string}${desc ? ` — ${desc}` : ''}${tags ? ` (tags: ${tags})` : ''}`);
+    }
+  }
+
+  return { corpus: lines.join('\n'), libraryItemCount: items.length };
 }
 
 export async function getLatestPersonaSnapshot(coachId: string): Promise<PersonaSnapshot | null> {
@@ -65,17 +86,6 @@ export async function savePersonaSnapshot(
   return mapSnapshot(data);
 }
 
-function mapSource(row: Record<string, unknown>): PersonaSource {
-  return {
-    id:         row.id as string,
-    coachId:    row.coach_id as string,
-    sourceType: row.source_type as PersonaSource['sourceType'],
-    content:    row.content as string | undefined,
-    url:        row.url as string | undefined,
-    createdAt:  row.created_at as string,
-  };
-}
-
 function mapSnapshot(row: Record<string, unknown>): PersonaSnapshot {
   return {
     id:          row.id as string,
@@ -86,4 +96,43 @@ function mapSnapshot(row: Record<string, unknown>): PersonaSnapshot {
     summary:     row.summary as string,
     rawSnapshot: row.raw_snapshot as Record<string, unknown>,
   };
+}
+
+/**
+ * For every book/pdf library item that has a URL, fetch and parse the PDF,
+ * then upsert the text chunks into Pinecone so they are available for RAG.
+ * Skips items where the URL is missing or the fetch/parse fails.
+ */
+export async function indexPdfLibraryItems(coachId: string): Promise<void> {
+  const { data: items } = await supabase
+    .from('coach_library_items')
+    .select('item_id, title, item_type, url')
+    .eq('coach_id', coachId)
+    .in('item_type', ['book', 'pdf'])
+    .not('url', 'is', null);
+
+  if (!items?.length) return;
+
+  await Promise.allSettled(
+    items.map(async (item) => {
+      const url = item.url as string;
+      const text = await extractPdfText(url);
+      if (!text.trim()) return;
+
+      // Rough chunk: every 2000 chars (~500 tokens)
+      const chunkSize = 2000;
+      const chunks: string[] = [];
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const c = text.slice(i, i + chunkSize).trim();
+        if (c) chunks.push(c);
+      }
+      if (!chunks.length) return;
+
+      await upsertLibraryChunks(coachId, item.item_id as string, chunks, {
+        source:   'pdf',
+        title:    item.title as string,
+        itemType: item.item_type as string,
+      });
+    })
+  );
 }

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     const coach = await getCoachBySlug(slug);
     const { enrollment, portalUrl } = await enrollClient(
       packageId,
-      coach.coachId,
+      coach.userId,
       { name: body.name, email: body.email, phone: body.phone, goals: body.goals },
       'client'
     );

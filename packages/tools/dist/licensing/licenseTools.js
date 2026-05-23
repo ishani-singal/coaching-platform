@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createModuleLicense = createModuleLicense;
 exports.createProgramLicense = createProgramLicense;
+exports.getPendingLicenseByToken = getPendingLicenseByToken;
+exports.activateProgramLicenseById = activateProgramLicenseById;
 exports.revokeModuleLicense = revokeModuleLicense;
 exports.getAncestryChain = getAncestryChain;
 exports.calculateRevenueSplit = calculateRevenueSplit;
@@ -11,7 +13,9 @@ exports.getLicensesHeldByCoach = getLicensesHeldByCoach;
 exports.getRevenueByCoach = getRevenueByCoach;
 const sdk_1 = require("@coaching/sdk");
 async function createModuleLicense(licensorId, licenseeId, moduleId, terms) {
-    const { data: mod } = await sdk_1.supabase.from('modules').select('creator_coach_id').eq('module_id', moduleId).single();
+    const { data: mod } = await sdk_1.supabase.from('modules').select('creator_coach_id, no_sublicense').eq('module_id', moduleId).single();
+    if (mod?.no_sublicense)
+        throw new Error('This module cannot be licensed');
     if (mod?.creator_coach_id !== licensorId) {
         const { data: existing } = await sdk_1.supabase
             .from('module_licenses')
@@ -35,17 +39,40 @@ async function createModuleLicense(licensorId, licenseeId, moduleId, terms) {
         throw new Error(error.message);
 }
 async function createProgramLicense(licensorId, licenseeId, programId, terms) {
-    const { error } = await sdk_1.supabase.from('program_licenses').insert({
+    const { data, error } = await sdk_1.supabase.from('program_licenses').insert({
         program_id: programId,
         licensor_coach_id: licensorId,
         licensee_coach_id: licenseeId,
-        direct_cut_pct: terms.directCutPct,
-        derivative_cut_pct: terms.derivativeCutPct,
+        direct_cut_pct: 0,
+        derivative_cut_pct: 0,
         propagate_to_depth: terms.propagateToDepth,
-        can_sublicense: terms.canSublicense,
-    });
+        can_sublicense: false,
+        license_fee_amount: terms.licenseFeeAmount ?? null,
+        license_fee_currency: terms.licenseFeeCurrency ?? 'USD',
+        status: 'pending',
+    }).select('license_id, invite_token').single();
     if (error)
         throw new Error(error.message);
+    return { licenseId: data.license_id, inviteToken: data.invite_token };
+}
+async function getPendingLicenseByToken(token) {
+    const { data } = await sdk_1.supabase
+        .from('program_licenses')
+        .select('*')
+        .eq('invite_token', token)
+        .maybeSingle();
+    return data ?? null;
+}
+async function activateProgramLicenseById(licenseId) {
+    const { data, error } = await sdk_1.supabase
+        .from('program_licenses')
+        .update({ status: 'active' })
+        .eq('license_id', licenseId)
+        .select('program_id, licensee_coach_id')
+        .single();
+    if (error)
+        throw new Error(error.message);
+    return { programId: data.program_id, licenseeCoachId: data.licensee_coach_id };
 }
 async function revokeModuleLicense(licenseId) {
     await sdk_1.supabase.from('module_licenses').delete().eq('license_id', licenseId);
@@ -86,9 +113,9 @@ function calculateRevenueSplit(priceUsd, ancestry) {
     allocations.push({ coachId: 'delivering', role: 'delivering_coach', ancestorDepth: 0, amountUsd: remaining, pct: deliveryPct });
     return allocations;
 }
-async function writeRevenueEvents(enrollmentId, allocations) {
+async function writeRevenueEvents(clientId, allocations) {
     const rows = allocations.map(a => ({
-        enrollment_id: enrollmentId,
+        client_id: clientId,
         coach_id: a.coachId,
         role: a.role,
         amount_usd: a.amountUsd,
@@ -105,7 +132,7 @@ async function getLicensesHeldByCoach(coachId) {
     return data ?? [];
 }
 async function getRevenueByCoach(coachId, since) {
-    let q = sdk_1.supabase.from('revenue_events').select('amount_usd, enrollment_id').eq('coach_id', coachId);
+    let q = sdk_1.supabase.from('revenue_events').select('amount_usd, client_id').eq('coach_id', coachId);
     if (since)
         q = q.gte('created_at', since);
     const { data } = await q;

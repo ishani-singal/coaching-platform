@@ -9,6 +9,7 @@ const AGENTS = [
   { id: 'coaching-persona-chat',    port: 3004, label: '🧠 Persona Chat' },
   { id: 'coaching-crm',             port: 3005, label: '👥 CRM' },
   { id: 'coaching-licensing',       port: 3006, label: '💰 Licensing' },
+  { id: 'coaching-payment',         port: 3007, label: '💳 Payment' },
 ];
 
 async function fetchSnapshot(port: number, userId: string) {

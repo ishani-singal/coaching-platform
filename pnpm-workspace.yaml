@@ -3,4 +3,5 @@ packages:
   - 'packages/tools'
   - 'packages/skills'
   - 'packages/agents/*'
+  - 'packages/stripe-webhooks'
   - 'shell'

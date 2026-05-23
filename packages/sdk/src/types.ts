@@ -101,40 +101,117 @@ export type BridgeMode =
 
 // ── Coaching domain types ────────────────────────────────────────────────────
 
-export type ViewType        = 'client' | 'trainee' | 'delivery';
 export type ContentType     =
   | 'text' | 'video' | 'pdf' | 'task' | 'check_in' | 'quiz' | 'facilitation_guide'
   | 'long_form_qa' | 'single_choice' | 'multi_choice' | 'match_following' | 'rating'
-  | 'assignment';
-export type PeriodType      = 'week' | 'day' | 'month' | 'quarter' | 'custom';
-export type LibraryItemType = 'youtube' | 'book' | 'article' | 'pdf' | 'podcast';
+  | 'assignment' | 'file' | 'image_embed';
+export type PeriodType      = 'week' | 'day' | 'month' | 'quarter' | 'steps' | 'custom';
+export type LibraryItemType = 'youtube' | 'book' | 'article' | 'pdf' | 'podcast' | 'note' | 'file';
+export type CoachingType =
+  | 'life_coach' | 'fitness_coach' | 'business_coach' | 'mental_health_coach'
+  | 'nutrition_coach' | 'career_coach' | 'executive_coach' | 'wellness_coach';
 export type EnrollmentType  = 'client' | 'trainee';
 export type PricingModel    = 'free' | 'one_time' | 'subscription';
 export type UserRole        = 'client' | 'trainee' | 'coach';
 export type SessionStatus   = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+
+export type NavItem = 'home' | 'services' | 'events' | 'about' | 'blog' | 'faq' | 'contact' | 'search' | 'library';
+
+// ── Website Builder ───────────────────────────────────────────────────────────
+
+export type WebsiteComponentType =
+  | 'hero'
+  | 'ribbon'
+  | 'cta_button'
+  | 'testimonial'
+  | 'feature_block'
+  | 'image_text'
+  | 'custom_html';
+
+export interface WebsiteComponent {
+  id: string;
+  type: WebsiteComponentType;
+  x: number;   // px from canvas left
+  y: number;   // px from canvas top
+  w: number;   // width in px
+  h: number;   // height in px
+  props: Record<string, string>;
+}
+
+export interface WebsiteConfig {
+  templateId: string;
+  components: WebsiteComponent[];
+}
 
 export interface ThemeConfig {
   primaryColor: string;
   fontFamily: string;
   sectionOrder: ('hero' | 'chat' | 'programs' | 'library' | 'booking' | 'payment')[];
   hiddenSections: string[];
+  navItems?: NavItem[];
 }
 
 export interface CoachProfile {
-  coachId: string;
+  userId: string;
   slug: string;
   displayName: string;
   bio?: string;
+  logo?: string;
   customDomain?: string;
   personaSnapshotId?: string;
   themeConfig?: ThemeConfig;
+  coachingType?: CoachingType | string;
+  socialMedia?: Record<string, string>;
+  websiteNavBar?: NavItem[];
+  customChatPrompt?: string;
+  listenerFirstMode?: boolean;
+  chatTools?: ChatTool[];
+  websiteDraft?: WebsiteConfig | null;
+  websitePublished?: WebsiteConfig | null;
+}
+
+export type ChatToolType = 'listen_first' | 'reflective_acknowledgement' | 'reply_style';
+
+export type ReplyStyle = 'narrative' | 'bullet' | 'mixed' | 'socratic';
+
+export interface ChatToolSettings {
+  /** @deprecated No longer used. Readiness is now determined automatically by an internal LLM check. */
+  questionPhaseRounds?: number;
+  /** reply_style: how the coach structures replies */
+  replyStyle?: ReplyStyle;
+}
+
+export interface ChatTool {
+  type: ChatToolType;
+  enabled: boolean;
+  settings?: ChatToolSettings;
+}
+
+export interface QuestionItem {
+  id: string;
+  text: string;
+  /** Importance weight 1–7 (7 = must answer first) */
+  weight: number;
+  /** Priority rank (1 = ask next, ascending) */
+  priority: number;
+  answered: boolean;
+  /** Answer quality 0.0–1.0. Set only when answered. 1.0 = explicit/specific, 0.7 = mostly answered, 0.4 = partial/implied, 0.1 = vague label only */
+  quality?: number;
+  /** True when the person volunteered this info unprompted — exclude from denominator, do not ask */
+  deprecated?: boolean;
+}
+
+export interface QuestionState {
+  questions: QuestionItem[];
+  /** 0–100 — sum(weight * quality for answered active) / sum(weight for active) * 100. Active = not deprecated. */
+  clarity: number;
 }
 
 export interface ClientProfile {
   clientId: string;
   coachId: string;
-  enrollmentId?: string;
   inviteToken?: string;
+  userId?: string;  // Supabase auth user_id — set when client creates an account
   name: string;
   email: string;
   phone?: string;
@@ -145,12 +222,18 @@ export interface ClientProfile {
     availability?: string;
     focusAreas?: string[];
   };
+  // Enrollment fields — populated when the client is enrolled in a package
+  packageId?: string;
+  enrollmentType?: EnrollmentType;
+  startedAt?: string;
+  completedAt?: string;
+  currentModuleId?: string;
+  responses: EnrollmentResponse[];
 }
 
 export interface ModuleSectionSpec {
   sectionId: string;
   sectionOrder: number;
-  visibleTo: ViewType[];
   contentType: ContentType;
   body: Record<string, unknown>;
 }
@@ -162,14 +245,12 @@ export interface ModuleRecord {
   category: string;
   version: number;
   derivedFromModuleId?: string;
-  sourceProgramId?: string;
-  isPublished: boolean;
+  noSublicense: boolean;
   sections?: ModuleSectionSpec[];
 }
 
 export interface ProgramPeriod {
-  periodId: string;
-  programId: string;
+  programId?: string;
   periodOrder: number;
   label: string;
   periodType: PeriodType;
@@ -181,7 +262,7 @@ export interface ProgramRecord {
   creatorCoachId: string;
   title: string;
   description?: string;
-  isPublished: boolean;
+  coverImageUrl?: string;
   modules?: ModuleRecord[];
   periods?: ProgramPeriod[];
 }
@@ -196,16 +277,44 @@ export interface CoachModuleClientData {
   updatedAt: string;
 }
 
+export type CertificateDesignVariant = 'classic' | 'modern' | 'minimal';
+
+export interface CertificateTemplate {
+  designVariant: CertificateDesignVariant;
+  /** Main heading, e.g. "Certificate of Completion" */
+  title: string;
+  /** Secondary line, e.g. "This is to certify that" */
+  subtitle?: string;
+  /** Text after trainee name, e.g. "for successfully completing" */
+  programLabel?: string;
+  coachName?: string;
+  coachTitle?: string;
+  /** Publicly accessible image URL for coach logo */
+  logoUrl?: string;
+  /** Hex accent colour, e.g. "#4F46E5" */
+  accentColor: string;
+  /** Label below coach signature line, e.g. "Certified by" */
+  signatoryLabel?: string;
+}
+
 export interface CoachingPackage {
   packageId: string;
   coachId: string;
-  personaSnapshotId: string;
   title: string;
   description?: string;
   coverImageUrl?: string;
   pricingModel: PricingModel;
   priceUsd?: number;
+  currencies: string[];
+  totalSeats?: number;
+  showSeatsFilled: boolean;
+  applyDeadline?: string;
+  discountPrice?: number;
+  discountUntil?: string;
   isPublished: boolean;
+  certificateUrl?: string;
+  certificateTemplate?: CertificateTemplate;
+  includedProgramIds: string[];
   programs?: ProgramRecord[];
 }
 
@@ -214,6 +323,8 @@ export interface LicenseTerms {
   derivativeCutPct: number;
   propagateToDepth: number | null;
   canSublicense: boolean;
+  licenseFeeAmount?: number;
+  licenseFeeCurrency?: string;
 }
 
 export interface AncestryRow {
@@ -243,7 +354,89 @@ export interface LibraryItem {
   thumbnailUrl?: string;
   metadata: Record<string, unknown>;
   displayOrder: number;
+  buyLink?: string;
+  embeddedAt?: string;
+  transcript?: string;
+  transcriptSource?: 'youtube_captions' | 'whisper' | 'manual' | 'text-extraction';
+  transcriptLanguage?: string;
+  chunksIndexed: boolean;
 }
+
+export interface CoachRecommendationSettings {
+  coachId: string;
+  tagWeight: number;
+  semanticWeight: number;
+  recencyBoost: number;
+  preferredTypes: LibraryItemType[];
+  maxResults: number;
+}
+
+export interface PineconeMatch {
+  id: string;
+  score: number;
+  metadata: Record<string, string>;
+}
+
+// ── AG-UI event types (SSE events emitted alongside chat text stream) ─────────
+
+export interface AguiEvent {
+  type: 'TEXT_MESSAGE_START' | 'TEXT_MESSAGE_CONTENT' | 'TEXT_MESSAGE_END'
+      | 'TOOL_CALL_START' | 'TOOL_CALL_END' | 'REFRESH_CONTENT';
+}
+
+export interface AguiLibraryCardEvent extends AguiEvent {
+  type: 'TOOL_CALL_END';
+  toolName: 'library_item_card';
+  output: {
+    itemId: string;
+    title: string;
+    itemType: LibraryItemType;
+    description?: string;
+    buyLink?: string;
+    thumbnailUrl?: string;
+    url?: string;
+    tags: string[];
+  };
+}
+
+export interface AguiToolCallStartEvent extends AguiEvent {
+  type: 'TOOL_CALL_START';
+  toolCallId: string;
+  toolName: string;
+  label: string;
+}
+
+export interface AguiModuleCardEvent extends AguiEvent {
+  type: 'TOOL_CALL_END';
+  toolName: 'module_card';
+  toolCallId: string;
+  output: { moduleId: string; title: string; category: string; };
+}
+
+export interface AguiProgramCardEvent extends AguiEvent {
+  type: 'TOOL_CALL_END';
+  toolName: 'program_card';
+  toolCallId: string;
+  output: { programId: string; title: string; periodCount?: number; };
+}
+
+export interface AguiPackageCardEvent extends AguiEvent {
+  type: 'TOOL_CALL_END';
+  toolName: 'package_card';
+  toolCallId: string;
+  output: { packageId: string; title: string; pricingModel: string; isPublished: boolean; };
+}
+
+export interface AguiRefreshContentEvent extends AguiEvent {
+  type: 'REFRESH_CONTENT';
+}
+
+export type ProgramBuilderAguiEvent =
+  | AguiToolCallStartEvent
+  | AguiModuleCardEvent
+  | AguiProgramCardEvent
+  | AguiPackageCardEvent
+  | AguiRefreshContentEvent;
 
 export interface PersonaSnapshot {
   id: string;
@@ -255,14 +448,7 @@ export interface PersonaSnapshot {
   rawSnapshot: Record<string, unknown>;
 }
 
-export interface PersonaSource {
-  id: string;
-  coachId: string;
-  sourceType: 'youtube' | 'text' | 'file' | 'linkedin' | 'instagram';
-  content?: string;
-  url?: string;
-  createdAt: string;
-}
+
 
 export interface PersonaRecommendation {
   type: 'module' | 'video' | 'book' | 'booking' | 'article';
@@ -274,23 +460,16 @@ export interface PersonaRecommendation {
   reasoning: string;
 }
 
-export interface EnrollmentRecord {
-  enrollmentId: string;
-  packageId: string;
-  installingCoachId: string;
-  clientId: string;
-  enrollmentType: EnrollmentType;
-  inviteToken: string;
-  startedAt?: string;
-  completedAt?: string;
-  currentModuleId?: string;
+export interface EnrollmentResponse {
+  sectionId: string;
+  responseData: Record<string, unknown>;
+  submittedAt: string;
 }
 
 export interface CoachingSession {
   sessionId: string;
   coachId: string;
   clientId: string;
-  enrollmentId?: string;
   bookingRef?: string;
   paymentRef?: string;
   scheduledAt: string;
@@ -329,10 +508,128 @@ export interface PaymentLink {
   paymentLinkId: string;
 }
 
+export type PaymentProvider = 'stripe' | 'razorpay';
+
+export type PaymentMethod =
+  | 'card'
+  | 'google_pay'
+  | 'us_bank_account'
+  | 'upi'
+  | 'netbanking'
+  | 'wallet';
+
+export type PaymentStatus =
+  | 'pending'
+  | 'succeeded'
+  | 'failed'
+  | 'refunded'
+  | 'requires_action';
+
+export interface CreatePaymentLinkParams {
+  amount: number;        // smallest currency unit (cents or paise)
+  currency: string;      // ISO 4217 uppercase
+  description: string;
+  redirectUrl?: string;
+  packageId?: string;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
   start: string;
   end: string;
   location?: string;
+}
+
+// ── Native Appointment Booking System ─────────────────────────────────────────
+
+export interface CancellationPolicy {
+  hours_notice: number;   // hours before appointment that cancellation is allowed with a refund
+  refund_pct:   number;   // 0–100: percentage of price refunded when cancelled within notice window
+}
+
+export interface RecurrenceConfig {
+  enabled:        boolean;
+  frequency:      'weekly' | 'biweekly' | 'monthly';
+  occurrences:    number;  // total number of sessions (including the first)
+  interval_weeks: number;  // 1 = weekly, 2 = biweekly, 4 = monthly
+}
+
+export interface AppointmentType {
+  appointmentTypeId:  string;
+  coachId:            string;
+  title:              string;
+  description:        string | null;
+  durationMins:       number;
+  bufferMins:         number;
+  priceUsd:           number;
+  currency:           string;
+  cancellationPolicy: CancellationPolicy;
+  minNoticeHours:     number;
+  maxDaysOut:         number;
+  isActive:           boolean;
+  recurrence:         RecurrenceConfig | null;
+  createdAt:          string;
+  updatedAt:          string;
+}
+
+export interface CoachAvailability {
+  availabilityId: string;
+  coachId:        string;
+  dayOfWeek:      number;   // 0=Sun … 6=Sat
+  startTime:      string;   // HH:MM
+  endTime:        string;   // HH:MM
+  timezone:       string;
+}
+
+export interface CoachCalendarConnection {
+  connectionId:        string;
+  coachId:             string;
+  googleAccountEmail:  string;
+  tokenExpiry:         string;
+  selectedCalendarIds: string[];
+}
+
+export interface GoogleCalendarItem {
+  id:      string;
+  summary: string;
+  primary: boolean;
+}
+
+export type AppointmentStatus =
+  | 'pending_payment'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'expired';
+
+export interface Appointment {
+  appointmentId:       string;
+  appointmentTypeId:   string;
+  coachId:             string;
+  clientName:          string;
+  clientEmail:         string;
+  startsAt:            string;   // ISO 8601
+  endsAt:              string;
+  timezone:            string;
+  status:              AppointmentStatus;
+  priceUsd:            number;
+  currency:            string;
+  paymentExternalId:   string | null;
+  paymentProvider:     string | null;
+  cancelledAt:         string | null;
+  cancellationReason:  string | null;
+  cancelledBy:         'coach' | 'client' | null;
+  refundIssued:        boolean;
+  refundAmountUsd:     number | null;
+  confirmedAt:         string | null;
+  recurrenceGroupId:   string | null;
+  recurrenceIndex:     number | null;
+  createdAt:           string;
+}
+
+export interface TimeSlot {
+  startsAt: string;   // ISO 8601 UTC
+  endsAt:   string;
+  label:    string;   // e.g. "9:00 AM"
 }

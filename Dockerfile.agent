@@ -1,0 +1,41 @@
+﻿ARG AGENT_NAME=01-program-builder
+
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+ARG AGENT_NAME
+WORKDIR /app
+
+RUN npm install -g pnpm@10.33.0
+
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+
+# Copy shared packages (needed by agents)
+COPY packages/sdk ./packages/sdk
+COPY packages/tools ./packages/tools
+COPY packages/skills ./packages/skills
+
+# Copy the specific agent
+COPY packages/agents/${AGENT_NAME} ./packages/agents/${AGENT_NAME}
+
+# Install all workspace deps
+RUN pnpm install --frozen-lockfile
+
+# Build shared packages, then the agent
+RUN pnpm --filter @coaching/sdk build \
+ && pnpm --filter @coaching/tools build \
+ && pnpm --filter @coaching/skills build \
+ && pnpm --filter "./packages/agents/${AGENT_NAME}" build
+
+# Bundle into a single self-contained file (resolves all workspace deps)
+RUN npx --yes @vercel/ncc build packages/agents/${AGENT_NAME}/dist/index.js \
+    -o /bundle \
+    --minify \
+    --no-cache
+
+# ── Stage 2: Production ───────────────────────────────────────────────────────
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /bundle/index.js ./index.js
+EXPOSE 3000
+CMD ["node", "index.js"]

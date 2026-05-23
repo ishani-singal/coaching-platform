@@ -7,7 +7,8 @@ export async function createModuleLicense(
   moduleId: string,
   terms: LicenseTerms
 ): Promise<void> {
-  const { data: mod } = await supabase.from('modules').select('creator_coach_id').eq('module_id', moduleId).single();
+  const { data: mod } = await supabase.from('modules').select('creator_coach_id, no_sublicense').eq('module_id', moduleId).single();
+  if (mod?.no_sublicense) throw new Error('This module cannot be licensed');
   if (mod?.creator_coach_id !== licensorId) {
     const { data: existing } = await supabase
       .from('module_licenses')
@@ -34,17 +35,41 @@ export async function createProgramLicense(
   licenseeId: string,
   programId: string,
   terms: LicenseTerms
-): Promise<void> {
-  const { error } = await supabase.from('program_licenses').insert({
-    program_id:          programId,
-    licensor_coach_id:   licensorId,
-    licensee_coach_id:   licenseeId,
-    direct_cut_pct:      terms.directCutPct,
-    derivative_cut_pct:  terms.derivativeCutPct,
-    propagate_to_depth:  terms.propagateToDepth,
-    can_sublicense:      terms.canSublicense,
-  });
+): Promise<{ inviteToken: string; licenseId: string }> {
+  const { data, error } = await supabase.from('program_licenses').insert({
+    program_id:            programId,
+    licensor_coach_id:     licensorId,
+    licensee_coach_id:     licenseeId,
+    direct_cut_pct:        0,
+    derivative_cut_pct:    0,
+    propagate_to_depth:    terms.propagateToDepth,
+    can_sublicense:        false,
+    license_fee_amount:    terms.licenseFeeAmount ?? null,
+    license_fee_currency:  terms.licenseFeeCurrency ?? 'USD',
+    status:                'pending',
+  }).select('license_id, invite_token').single();
   if (error) throw new Error(error.message);
+  return { licenseId: data.license_id as string, inviteToken: data.invite_token as string };
+}
+
+export async function getPendingLicenseByToken(token: string): Promise<Record<string, unknown> | null> {
+  const { data } = await supabase
+    .from('program_licenses')
+    .select('*')
+    .eq('invite_token', token)
+    .maybeSingle();
+  return data ?? null;
+}
+
+export async function activateProgramLicenseById(licenseId: string): Promise<{ programId: string; licenseeCoachId: string }> {
+  const { data, error } = await supabase
+    .from('program_licenses')
+    .update({ status: 'active' })
+    .eq('license_id', licenseId)
+    .select('program_id, licensee_coach_id')
+    .single();
+  if (error) throw new Error(error.message);
+  return { programId: data.program_id as string, licenseeCoachId: data.licensee_coach_id as string };
 }
 
 export async function revokeModuleLicense(licenseId: string): Promise<void> {
@@ -94,9 +119,9 @@ export function calculateRevenueSplit(priceUsd: number, ancestry: AncestryRow[])
   return allocations;
 }
 
-export async function writeRevenueEvents(enrollmentId: string, allocations: RevenueAllocation[]): Promise<void> {
+export async function writeRevenueEvents(clientId: string, allocations: RevenueAllocation[]): Promise<void> {
   const rows = allocations.map(a => ({
-    enrollment_id:  enrollmentId,
+    client_id:      clientId,
     coach_id:       a.coachId,
     role:           a.role,
     amount_usd:     a.amountUsd,
@@ -116,7 +141,7 @@ export async function getLicensesHeldByCoach(coachId: string) {
 }
 
 export async function getRevenueByCoach(coachId: string, since?: string) {
-  let q = supabase.from('revenue_events').select('amount_usd, enrollment_id').eq('coach_id', coachId);
+  let q = supabase.from('revenue_events').select('amount_usd, client_id').eq('coach_id', coachId);
   if (since) q = q.gte('created_at', since);
   const { data } = await q;
   const rows = data ?? [];

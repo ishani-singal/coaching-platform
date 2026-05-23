@@ -1,12 +1,11 @@
 import { supabase } from '@coaching/sdk';
-import { ModuleRecord, ModuleSectionSpec, ViewType, ContentType } from '@coaching/sdk';
+import { ModuleRecord, ModuleSectionSpec, ContentType } from '@coaching/sdk';
 
 export async function createModule(
   coachId: string,
   title: string,
   category: string,
-  derivedFromId?: string,
-  sourceProgramId?: string
+  derivedFromId?: string
 ): Promise<ModuleRecord> {
   const { data, error } = await supabase
     .from('modules')
@@ -15,7 +14,6 @@ export async function createModule(
       title,
       category,
       derived_from_module_id: derivedFromId ?? null,
-      source_program_id:      sourceProgramId ?? null,
     })
     .select()
     .single();
@@ -26,69 +24,91 @@ export async function createModule(
 export async function addSection(
   moduleId: string,
   order: number,
-  visibleTo: ViewType[],
   contentType: ContentType,
   body: Record<string, unknown>
 ): Promise<ModuleSectionSpec> {
-  const { data, error } = await supabase
-    .from('module_sections')
-    .insert({ module_id: moduleId, section_order: order, visible_to: visibleTo, content_type: contentType, body })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('append_module_section', {
+    p_module_id:     moduleId,
+    p_section_order: order,
+    p_content_type:  contentType,
+    p_body:          body,
+  });
   if (error) throw new Error(error.message);
-  return mapSection(data);
+  return mapSection(data as Record<string, unknown>);
 }
 
-export async function updateSection(sectionId: string, patch: Partial<ModuleSectionSpec>): Promise<void> {
-  const update: Record<string, unknown> = {};
-  if (patch.visibleTo)    update.visible_to    = patch.visibleTo;
-  if (patch.contentType)  update.content_type  = patch.contentType;
-  if (patch.body)         update.body          = patch.body;
-  if (patch.sectionOrder !== undefined) update.section_order = patch.sectionOrder;
-  await supabase.from('module_sections').update(update).eq('section_id', sectionId);
+export async function updateSection(
+  moduleId: string,
+  sectionId: string,
+  patch: Partial<ModuleSectionSpec>
+): Promise<void> {
+  const { error } = await supabase.rpc('update_module_section', {
+    p_module_id:     moduleId,
+    p_section_id:    sectionId,
+    p_content_type:  patch.contentType  ?? null,
+    p_body:          patch.body         ?? null,
+    p_section_order: patch.sectionOrder ?? null,
+  });
+  if (error) throw new Error(error.message);
 }
 
-export async function deleteSection(sectionId: string): Promise<void> {
-  await supabase.from('module_sections').delete().eq('section_id', sectionId);
+export async function deleteSection(moduleId: string, sectionId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_module_section', {
+    p_module_id:  moduleId,
+    p_section_id: sectionId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteModule(moduleId: string, coachId: string): Promise<void> {
+  // Remove all FK dependents first (none of these have ON DELETE CASCADE)
+  await supabase.from('program_modules').delete().eq('module_id', moduleId);
+  await supabase.from('module_licenses').delete().eq('module_id', moduleId);
+  await supabase.from('module_ancestry').delete().or(`module_id.eq.${moduleId},ancestor_module_id.eq.${moduleId}`);
+  // Null out any module that was derived from this one
+  await supabase.from('modules').update({ derived_from_module_id: null }).eq('derived_from_module_id', moduleId);
+  // Null out enrollment tracking pointer on any clients at this module
+  await supabase.from('client_profiles').update({ current_module_id: null }).eq('current_module_id', moduleId);
+  const { error } = await supabase.from('modules').delete()
+    .eq('module_id', moduleId)
+    .eq('creator_coach_id', coachId);
+  if (error) throw new Error(error.message);
 }
 
 export async function reorderSections(moduleId: string, orderedSectionIds: string[]): Promise<void> {
-  await Promise.all(
-    orderedSectionIds.map((id, idx) =>
-      supabase.from('module_sections').update({ section_order: idx }).eq('section_id', id).eq('module_id', moduleId)
-    )
-  );
+  const { error } = await supabase.rpc('reorder_module_sections', {
+    p_module_id:   moduleId,
+    p_ordered_ids: orderedSectionIds,
+  });
+  if (error) throw new Error(error.message);
 }
 
-export async function publishModule(moduleId: string): Promise<void> {
-  await supabase.from('modules').update({ is_published: true }).eq('module_id', moduleId);
-}
-
-export async function getModuleWithSections(moduleId: string, viewType: ViewType): Promise<ModuleRecord> {
-  const { data: mod, error } = await supabase
+export async function getModuleWithSections(moduleId: string): Promise<ModuleRecord> {
+  const { data, error } = await supabase
     .from('modules')
     .select('*')
     .eq('module_id', moduleId)
     .single();
   if (error) throw new Error(error.message);
-
-  const { data: sections } = await supabase
-    .from('module_sections')
-    .select('*')
-    .eq('module_id', moduleId)
-    .contains('visible_to', [viewType])
-    .order('section_order');
-
-  return { ...mapModule(mod), sections: (sections ?? []).map(mapSection) };
+  return mapModule(data);
 }
 
-export async function forkModule(originalModuleId: string, newCoachId: string): Promise<ModuleRecord> {
+export async function forkModule(
+  originalModuleId: string,
+  newCoachId: string,
+  opts?: { noSublicense?: boolean }
+): Promise<ModuleRecord> {
   const { data: orig, error: e1 } = await supabase
     .from('modules')
     .select('*')
     .eq('module_id', originalModuleId)
     .single();
   if (e1) throw new Error(e1.message);
+
+  // Guard: no_sublicense modules cannot be forked by a different coach
+  if (orig.no_sublicense && newCoachId !== orig.creator_coach_id) {
+    throw new Error('This module cannot be forked');
+  }
 
   const { data: newMod, error: e2 } = await supabase
     .from('modules')
@@ -97,27 +117,12 @@ export async function forkModule(originalModuleId: string, newCoachId: string): 
       title:                  orig.title,
       category:               orig.category,
       derived_from_module_id: originalModuleId,
+      sections:               orig.sections,
+      no_sublicense:          opts?.noSublicense ?? false,
     })
     .select()
     .single();
   if (e2) throw new Error(e2.message);
-
-  const { data: sections } = await supabase
-    .from('module_sections')
-    .select('*')
-    .eq('module_id', originalModuleId);
-
-  if (sections && sections.length > 0) {
-    await supabase.from('module_sections').insert(
-      sections.map((s: Record<string, unknown>) => ({
-        module_id:     newMod.module_id,
-        section_order: s.section_order,
-        visible_to:    s.visible_to,
-        content_type:  s.content_type,
-        body:          s.body,
-      }))
-    );
-  }
 
   // Load existing ancestry for the original module
   const { data: ancestry } = await supabase
@@ -181,12 +186,62 @@ export async function updateModule(
 
 export async function getAllModuleSections(moduleId: string): Promise<ModuleSectionSpec[]> {
   const { data, error } = await supabase
-    .from('module_sections')
-    .select('*')
+    .from('modules')
+    .select('sections')
     .eq('module_id', moduleId)
-    .order('section_order');
+    .single();
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapSection);
+  const mapped = ((data?.sections ?? []) as Record<string, unknown>[]).map(mapSection);
+  const seen = new Set<string>();
+  return mapped.filter(s => {
+    if (seen.has(s.sectionId)) return false;
+    seen.add(s.sectionId);
+    return true;
+  });
+}
+
+function isSectionNonEmpty(contentType: string, body: Record<string, unknown>): boolean {
+  switch (contentType) {
+    case 'text':
+    case 'facilitation_guide':
+      return typeof body.content === 'string' && body.content.trim() !== '';
+    case 'video':
+      return typeof body.embedUrl === 'string' && body.embedUrl.trim() !== '';
+    case 'pdf':
+      return typeof body.url === 'string' && body.url.trim() !== '';
+    case 'task':
+      return Array.isArray(body.items) && (body.items as unknown[]).length > 0;
+    case 'check_in':
+    case 'rating':
+      return typeof body.prompt === 'string' && body.prompt.trim() !== '';
+    case 'quiz':
+      return Array.isArray(body.questions) && (body.questions as unknown[]).length > 0;
+    case 'long_form_qa':
+    case 'single_choice':
+    case 'multi_choice':
+      return typeof body.question === 'string' && body.question.trim() !== '';
+    case 'match_following':
+      return Array.isArray(body.pairs) && (body.pairs as unknown[]).length > 0;
+    case 'assignment':
+      return [
+        body.title, body.instructions,
+      ].some(v => typeof v === 'string' && v.trim() !== '');
+    default:
+      return Object.values(body).some(v => v !== null && v !== undefined && v !== '');
+  }
+}
+
+export async function pruneEmptySections(moduleId: string): Promise<void> {
+  const sections = await getAllModuleSections(moduleId);
+  if (sections.length === 0) return;
+
+  const emptyIds = sections
+    .filter(s => !isSectionNonEmpty(s.contentType, s.body))
+    .map(s => s.sectionId);
+
+  if (emptyIds.length === 0) return;
+
+  await Promise.all(emptyIds.map(id => deleteSection(moduleId, id)));
 }
 
 function mapModule(row: Record<string, unknown>): ModuleRecord {
@@ -197,8 +252,8 @@ function mapModule(row: Record<string, unknown>): ModuleRecord {
     category:            (row.category ?? '') as string,
     version:             row.version as number,
     derivedFromModuleId: row.derived_from_module_id as string | undefined,
-    sourceProgramId:     row.source_program_id as string | undefined,
-    isPublished:         row.is_published as boolean,
+    noSublicense:        (row.no_sublicense as boolean) ?? false,
+    sections:            ((row.sections ?? []) as Record<string, unknown>[]).map(mapSection),
   };
 }
 
@@ -206,7 +261,6 @@ function mapSection(row: Record<string, unknown>): ModuleSectionSpec {
   return {
     sectionId:    row.section_id as string,
     sectionOrder: row.section_order as number,
-    visibleTo:    row.visible_to as ViewType[],
     contentType:  row.content_type as ContentType,
     body:         row.body as Record<string, unknown>,
   };

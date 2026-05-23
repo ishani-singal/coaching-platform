@@ -5,13 +5,12 @@ exports.updateSessionStatus = updateSessionStatus;
 exports.getSessionHistory = getSessionHistory;
 exports.getUpcomingSessions = getUpcomingSessions;
 const sdk_1 = require("@coaching/sdk");
-async function recordSession(coachId, clientId, enrollmentId, bookingRef, paymentRef, scheduledAt, durationMins = 60) {
+async function recordSession(coachId, clientId, bookingRef, paymentRef, scheduledAt, durationMins = 60) {
     const { data, error } = await sdk_1.supabase
         .from('coaching_sessions')
         .insert({
         coach_id: coachId,
         client_id: clientId,
-        enrollment_id: enrollmentId,
         booking_ref: bookingRef,
         payment_ref: paymentRef,
         scheduled_at: scheduledAt.toISOString(),
@@ -51,7 +50,6 @@ function mapSession(row) {
         sessionId: row.session_id,
         coachId: row.coach_id,
         clientId: row.client_id,
-        enrollmentId: row.enrollment_id,
         bookingRef: row.booking_ref,
         paymentRef: row.payment_ref,
         scheduledAt: row.scheduled_at,

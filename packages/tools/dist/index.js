@@ -14,11 +14,13 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+__exportStar(require("./llm/llmClient"), exports);
 __exportStar(require("./bridge/agentBridge"), exports);
 __exportStar(require("./bridge/calendarBridge"), exports);
 __exportStar(require("./bridge/bookingBridge"), exports);
 __exportStar(require("./bridge/paymentBridge"), exports);
 __exportStar(require("./coach/coachTools"), exports);
+__exportStar(require("./client/clientAuthTools"), exports);
 __exportStar(require("./persona/personaTools"), exports);
 __exportStar(require("./persona/recommendationTools"), exports);
 __exportStar(require("./programs/moduleTools"), exports);
@@ -32,4 +34,8 @@ __exportStar(require("./crm/crmTools"), exports);
 __exportStar(require("./crm/libraryTools"), exports);
 __exportStar(require("./crm/sessionTools"), exports);
 __exportStar(require("./youtube/youtubeTools"), exports);
+__exportStar(require("./youtube/youtubeCaptionsTools"), exports);
+__exportStar(require("./embeddings/pineconeTools"), exports);
+__exportStar(require("./embeddings/pdfTools"), exports);
+__exportStar(require("./transcription/whisperTools"), exports);
 //# sourceMappingURL=index.js.map

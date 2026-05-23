@@ -2,10 +2,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scoreLibraryItemsForClient = scoreLibraryItemsForClient;
 exports.scorePackagesForClient = scorePackagesForClient;
+exports.getRecommendationSettings = getRecommendationSettings;
+exports.updateRecommendationSettings = updateRecommendationSettings;
+exports.semanticRecommendations = semanticRecommendations;
 exports.formatRecommendationInPersona = formatRecommendationInPersona;
 exports.streamChatInPersona = streamChatInPersona;
 exports.toPersonaRecommendations = toPersonaRecommendations;
-const generative_ai_1 = require("@google/generative-ai");
+const llmClient_1 = require("../llm/llmClient");
+const sdk_1 = require("@coaching/sdk");
+const pineconeTools_1 = require("../embeddings/pineconeTools");
+const libraryTools_1 = require("../crm/libraryTools");
+// ── Legacy keyword scoring (kept for fallback) ────────────────────────────────
 function scoreLibraryItemsForClient(items, profile) {
     const focusAreas = profile.preferences.focusAreas ?? [];
     const goalWords = (profile.goals ?? '').toLowerCase().split(/\s+/);
@@ -26,21 +33,115 @@ function scorePackagesForClient(packages, profile) {
         return { item: pkg, score: keywordMatch, matchedGoals: focusAreas };
     }).sort((a, b) => b.score - a.score);
 }
+// ── Recommendation settings CRUD ─────────────────────────────────────────────
+const DEFAULT_SETTINGS = {
+    tagWeight: 2.0,
+    semanticWeight: 1.0,
+    recencyBoost: 0.0,
+    preferredTypes: [],
+    maxResults: 5,
+};
+async function getRecommendationSettings(coachId) {
+    const { data } = await sdk_1.supabase
+        .from('coach_recommendation_settings')
+        .select('*')
+        .eq('coach_id', coachId)
+        .maybeSingle();
+    if (!data)
+        return { coachId, ...DEFAULT_SETTINGS };
+    return {
+        coachId,
+        tagWeight: data.tag_weight,
+        semanticWeight: data.semantic_weight,
+        recencyBoost: data.recency_boost,
+        preferredTypes: data.preferred_types,
+        maxResults: data.max_results,
+    };
+}
+async function updateRecommendationSettings(coachId, patch) {
+    const update = { coach_id: coachId, updated_at: new Date().toISOString() };
+    if (patch.tagWeight !== undefined)
+        update.tag_weight = patch.tagWeight;
+    if (patch.semanticWeight !== undefined)
+        update.semantic_weight = patch.semanticWeight;
+    if (patch.recencyBoost !== undefined)
+        update.recency_boost = patch.recencyBoost;
+    if (patch.preferredTypes !== undefined)
+        update.preferred_types = patch.preferredTypes;
+    if (patch.maxResults !== undefined)
+        update.max_results = patch.maxResults;
+    const { error } = await sdk_1.supabase
+        .from('coach_recommendation_settings')
+        .upsert(update, { onConflict: 'coach_id' });
+    if (error)
+        throw new Error(error.message);
+}
+// ── Semantic recommendations (Pinecone-backed) ────────────────────────────────
+const RECOMMENDATION_RESOURCE_TYPES = new Set(['book', 'article', 'podcast', 'youtube', 'pdf', 'file']);
+const MAX_RECOMMENDATIONS = 4;
+async function semanticRecommendations(coachId, clientProfile, query, settings, citedItemIds) {
+    const cfg = settings ?? await getRecommendationSettings(coachId);
+    const focusAreas = clientProfile.preferences.focusAreas ?? [];
+    const citedSet = new Set(citedItemIds ?? []);
+    const allItems = await (0, libraryTools_1.getLibraryByCoach)(coachId);
+    const itemMap = new Map(allItems.map(i => [i.itemId, i]));
+    // ── Cited items first (guaranteed slots) ──────────────────────────────────
+    const citedScored = [...citedSet]
+        .map(id => itemMap.get(id))
+        .filter((item) => !!item && RECOMMENDATION_RESOURCE_TYPES.has(item.itemType))
+        .map(item => ({ item, score: Infinity, matchedGoals: item.tags.filter(t => focusAreas.includes(t)) }));
+    const remainingSlots = MAX_RECOMMENDATIONS - citedScored.length;
+    // ── Semantic fill for remaining slots ────────────────────────────────────
+    let semanticScored = [];
+    if (remainingSlots > 0) {
+        const pineconeTopK = Math.max(remainingSlots * 4, 20);
+        const matches = await (0, pineconeTools_1.vectorSearchLibrary)(coachId, query, pineconeTopK);
+        if (matches.length > 0) {
+            const semanticItemIds = [...new Set(matches.map(m => m.metadata.itemId).filter(Boolean))];
+            const now = Date.now();
+            semanticScored = semanticItemIds
+                .filter(id => !citedSet.has(id))
+                .map(itemId => {
+                const item = itemMap.get(itemId);
+                if (!item)
+                    return null;
+                if (!RECOMMENDATION_RESOURCE_TYPES.has(item.itemType))
+                    return null;
+                if (cfg.preferredTypes.length > 0 && !cfg.preferredTypes.includes(item.itemType))
+                    return null;
+                const semanticScore = matches
+                    .filter(m => m.metadata.itemId === itemId)
+                    .reduce((best, m) => Math.max(best, m.score), 0);
+                const tagOverlap = item.tags.filter(t => focusAreas.includes(t)).length;
+                const publishedAt = item.metadata.publishedAt || '';
+                const ageMs = publishedAt ? now - new Date(publishedAt).getTime() : Infinity;
+                const ageDays = ageMs / (1000 * 60 * 60 * 24);
+                const recencyScore = ageDays < 365 ? Math.max(0, 1 - ageDays / 365) : 0;
+                const totalScore = semanticScore * cfg.semanticWeight +
+                    tagOverlap * cfg.tagWeight +
+                    recencyScore * cfg.recencyBoost;
+                return { item, score: totalScore, matchedGoals: item.tags.filter(t => focusAreas.includes(t)) };
+            })
+                .filter((s) => s !== null)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, remainingSlots);
+        }
+    }
+    return toPersonaRecommendations([...citedScored, ...semanticScored]);
+}
+// ── Formatting helpers ────────────────────────────────────────────────────────
 async function formatRecommendationInPersona(items, snapshot, query) {
-    const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genai.getGenerativeModel({
-        model: 'gemini-2.5-flash-preview-04-17',
-        systemInstruction: `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`,
-    });
+    const llm = (0, llmClient_1.getLLMClient)();
+    const systemPrompt = `You are ${snapshot.summary}. Tone: ${snapshot.tone}. Style: ${snapshot.style}. Respond in first person as the coach.`;
     const context = items.slice(0, 5).map(s => {
         const item = s.item;
-        return `- ${item.title}: ${item.description ?? ''}`;
+        const buyNote = item.buyLink ? ` (buy: ${item.buyLink})` : '';
+        return `- ${item.title}${buyNote}: ${item.description ?? ''}`;
     }).join('\n');
-    const result = await model.generateContent(`${query}\n\nRelevant resources:\n${context}`);
-    return result.response.text();
+    return llm.generateText(systemPrompt, `${query}\n\nRelevant resources:\n${context}`);
 }
 async function* streamChatInPersona(snapshot, clientProfile, history, message) {
-    const genai = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const llm = (0, llmClient_1.getLLMClient)();
     const systemPrompt = [
         `You are ${snapshot.summary}.`,
         `Tone: ${snapshot.tone}. Style: ${snapshot.style}.`,
@@ -48,36 +149,27 @@ async function* streamChatInPersona(snapshot, clientProfile, history, message) {
             ? `You are speaking with ${clientProfile.name}. Their goals: ${clientProfile.goals}.`
             : 'You are speaking with a prospective client.',
     ].join('\n');
-    const model = genai.getGenerativeModel({
-        model: 'gemini-2.5-flash-preview-04-17',
-        systemInstruction: systemPrompt,
-    });
-    const chat = model.startChat({
-        history: history.map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-        })),
-    });
-    const result = await chat.sendMessageStream(message);
-    for await (const chunk of result.stream) {
-        const text = chunk.text();
-        if (text)
-            yield text;
-    }
+    yield* llm.streamChat(systemPrompt, history, message);
 }
 function toPersonaRecommendations(scored) {
-    return scored.slice(0, 5).map(s => {
+    return scored.map(s => {
         const item = s.item;
         const type = item.itemType === 'youtube' ? 'video' :
             item.itemType === 'book' ? 'book' :
-                item.itemType === 'article' ? 'article' : 'module';
+                item.itemType === 'podcast' ? 'article' :
+                    item.itemType === 'pdf' ? 'article' :
+                        item.itemType === 'file' ? 'article' :
+                            item.itemType === 'article' ? 'article' : 'module';
         return {
             type,
             title: item.title,
             description: item.description ?? '',
-            url: item.url,
+            // For books: return buy link instead of file URL
+            url: item.itemType === 'book' ? item.buyLink : item.url,
             score: s.score,
-            reasoning: `Matched: ${s.matchedGoals.join(', ')}`,
+            reasoning: s.matchedGoals.length
+                ? `Matched focus areas: ${s.matchedGoals.join(', ')}`
+                : 'Semantically relevant to your question',
         };
     });
 }

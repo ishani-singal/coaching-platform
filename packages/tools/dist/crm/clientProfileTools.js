@@ -6,7 +6,6 @@ exports.getClientProfile = getClientProfile;
 exports.getClientByInviteToken = getClientByInviteToken;
 exports.getClientsByCoach = getClientsByCoach;
 exports.updateClientProfile = updateClientProfile;
-exports.linkClientToEnrollment = linkClientToEnrollment;
 const sdk_1 = require("@coaching/sdk");
 async function createClientProfile(coachId, data) {
     const { data: row, error } = await sdk_1.supabase
@@ -27,9 +26,26 @@ async function createClientProfile(coachId, data) {
     return mapClient(row);
 }
 async function upsertClientProfile(coachId, email, data) {
+    const { data: existing } = await sdk_1.supabase
+        .from('client_profiles')
+        .select('client_id')
+        .eq('coach_id', coachId)
+        .eq('email', email)
+        .maybeSingle();
+    if (existing) {
+        const { data: row, error } = await sdk_1.supabase
+            .from('client_profiles')
+            .update({ name: data.name ?? '', goals: data.goals, background: data.background, preferences: data.preferences ?? {} })
+            .eq('client_id', existing.client_id)
+            .select()
+            .single();
+        if (error)
+            throw new Error(error.message);
+        return mapClient(row);
+    }
     const { data: row, error } = await sdk_1.supabase
         .from('client_profiles')
-        .upsert({ coach_id: coachId, email, name: data.name ?? '', goals: data.goals, background: data.background, preferences: data.preferences ?? {} }, { onConflict: 'coach_id,email' })
+        .insert({ coach_id: coachId, email, name: data.name ?? '', goals: data.goals, background: data.background, preferences: data.preferences ?? {} })
         .select()
         .single();
     if (error)
@@ -66,21 +82,29 @@ async function updateClientProfile(clientId, patch) {
         update.preferences = patch.preferences;
     await sdk_1.supabase.from('client_profiles').update(update).eq('client_id', clientId);
 }
-async function linkClientToEnrollment(clientId, enrollmentId) {
-    await sdk_1.supabase.from('client_profiles').update({ enrollment_id: enrollmentId }).eq('client_id', clientId);
-}
 function mapClient(row) {
+    const rawResponses = (row.responses ?? []);
     return {
         clientId: row.client_id,
         coachId: row.coach_id,
-        enrollmentId: row.enrollment_id,
         inviteToken: row.invite_token,
+        userId: row.user_id,
         name: row.name,
         email: row.email,
         phone: row.phone,
         goals: (row.goals ?? ''),
         background: (row.background ?? ''),
         preferences: (row.preferences ?? {}),
+        packageId: row.package_id,
+        enrollmentType: row.enrollment_type,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        currentModuleId: row.current_module_id,
+        responses: rawResponses.map(r => ({
+            sectionId: r.section_id,
+            responseData: (r.response_data ?? {}),
+            submittedAt: r.submitted_at,
+        })),
     };
 }
 //# sourceMappingURL=clientProfileTools.js.map

@@ -3,29 +3,38 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "openai": "^4.104.0",
     "@coaching/sdk": "workspace:*",
-    "@coaching/tools": "workspace:*",
+    "@copilotkit/react-core": "^1.56.2",
+    "@copilotkit/react-ui": "^1.56.0",
+    "@copilotkit/runtime": "^1.56.5",
     "@coaching/skills": "workspace:*",
-    "@supabase/supabase-js": "^2",
+    "@coaching/tools": "workspace:*",
     "@supabase/ssr": "^0.5.0",
+    "@supabase/supabase-js": "^2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-markdown": "^9.0.0"
+    "react-markdown": "^9.0.0",
+    "resend": "^4.0.0",
+    "stripe": "^14.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0",
-    "tailwindcss": "^3.4.0",
     "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0"
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.0"
   }
 }

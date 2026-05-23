@@ -1,11 +1,11 @@
-import { ProgramRecord, ModuleRecord, ModuleSectionSpec, ViewType, PeriodType } from '@coaching/sdk';
+import { ProgramRecord, ModuleRecord, ModuleSectionSpec, PeriodType } from '@coaching/sdk';
 import {
   createProgram,
-  addModuleToProgram,
+  createModule,
+  addModuleToPeriodByOrder,
   getProgramWithModules,
   getModuleWithSections,
   createProgramPeriod,
-  addModuleToPeriod,
   getProgramWithPeriods,
 } from '@coaching/tools';
 import { scaffoldModule } from './moduleAuthoringSkill';
@@ -27,8 +27,9 @@ export async function buildProgram(coachId: string, title: string, moduleIds: st
   }
 
   const program = await createProgram(coachId, title);
+  const period = await createProgramPeriod(program.programId, 0, '', 'custom');
   for (let i = 0; i < moduleIds.length; i++) {
-    await addModuleToProgram(program.programId, moduleIds[i], i);
+    await addModuleToPeriodByOrder(program.programId, period.periodOrder, moduleIds[i], i);
   }
   return program;
 }
@@ -58,9 +59,9 @@ export async function buildProgramWithPeriods(
 
   for (let pi = 0; pi < periods.length; pi++) {
     const p = periods[pi];
-    const period = await createProgramPeriod(program.programId, pi, p.label, p.periodType);
+    await createProgramPeriod(program.programId, pi, p.label, p.periodType);
     for (let mi = 0; mi < p.moduleIds.length; mi++) {
-      await addModuleToPeriod(program.programId, p.moduleIds[mi], period.periodId, mi);
+      await addModuleToPeriodByOrder(program.programId, pi, p.moduleIds[mi], mi);
     }
   }
 
@@ -70,7 +71,7 @@ export async function buildProgramWithPeriods(
 export async function createInlineModule(
   coachId: string,
   programId: string,
-  periodId: string | undefined,
+  periodOrder: number | undefined,
   title: string,
   category: string,
   displayOrder: number
@@ -82,22 +83,21 @@ export async function createInlineModule(
     .single();
   if (prog?.creator_coach_id !== coachId) throw new Error('Not authorized to add modules to this program');
 
-  const mod = await scaffoldModule(coachId, title, category, programId);
+  // Use createModule directly — scaffoldModule adds 3 empty placeholder sections
+  // which can fail and prevent the module from appearing in the Modules tab.
+  const mod = await createModule(coachId, title, category);
 
-  if (periodId) {
-    await addModuleToPeriod(programId, mod.moduleId, periodId, displayOrder);
-  } else {
-    await addModuleToProgram(programId, mod.moduleId, displayOrder);
-  }
+  const targetPeriodOrder = periodOrder ?? 0;
+  await addModuleToPeriodByOrder(programId, targetPeriodOrder, mod.moduleId, displayOrder);
 
   return mod;
 }
 
-export async function previewProgram(programId: string, viewType: ViewType): Promise<ModuleSectionSpec[]> {
+export async function previewProgram(programId: string): Promise<ModuleSectionSpec[]> {
   const prog = await getProgramWithModules(programId);
   const allSections: ModuleSectionSpec[] = [];
   for (const mod of prog.modules ?? []) {
-    const full = await getModuleWithSections(mod.moduleId, viewType);
+    const full = await getModuleWithSections(mod.moduleId);
     allSections.push(...(full.sections ?? []));
   }
   return allSections;

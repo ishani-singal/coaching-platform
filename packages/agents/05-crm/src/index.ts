@@ -1,9 +1,10 @@
 import { createAgentServer, AgentManifest, ContextRequest, ActionRequest } from '@coaching/sdk';
 import { configureBridge, addNote, deleteNote, addTag, removeTag, getSessionHistory, updateClientProfile } from '@coaching/tools';
-import { getClientDashboard, getCoachCRMOverview, getPipelineView } from '@coaching/skills';
+import { getClientDashboard, getCoachCRMOverview, getPipelineView, getDashboardStats } from '@coaching/skills';
 import { syncBookingsToSessions } from '@coaching/skills';
 import { getClientsByCoach } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
+import { Resend } from 'resend';
 
 const PORT = parseInt(process.env.AGENT_CRM_PORT ?? '3005', 10);
 const AGENT_ID = 'coaching-crm';
@@ -59,6 +60,8 @@ const manifest: AgentManifest = {
     { name: 'update_client',     description: 'Update client profile',               params: { clientId: { type: 'string', required: true, description: '' }, patch: { type: 'object', required: true, description: '' } } },
     { name: 'get_sessions',      description: 'Get session history',                 params: { clientId: { type: 'string', required: false, description: '' } } },
     { name: 'sync_bookings',     description: 'Sync bookings to sessions',           params: {} },
+    { name: 'get_dashboard_stats', description: 'Get CRM dashboard stats',           params: {} },
+    { name: 'resend_invite',     description: 'Resend enrollment invite email to a client', params: { clientId: { type: 'string', required: true, description: '' } } },
   ],
 };
 
@@ -127,6 +130,31 @@ async function onAction(req: ActionRequest) {
     case 'sync_bookings':
       await syncBookingsToSessions(uid, uid);
       return { success: true, message: 'Bookings synced' };
+
+    case 'get_dashboard_stats':
+      return { success: true, message: 'Dashboard stats', data: await getDashboardStats(uid) as unknown as Record<string, unknown> };
+
+    case 'resend_invite': {
+      const { data: client } = await supabase
+        .from('client_profiles')
+        .select('invite_token, email, name, packages(title)')
+        .eq('client_id', p.clientId)
+        .single();
+      if (!client) return { success: false, message: 'Client not found' };
+      const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+      const protocol = domain.startsWith('localhost') ? 'http' : 'https';
+      const portalUrl = `${protocol}://${domain}/portal/${client.invite_token}`;
+      if (process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from:    process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
+          to:      client.email as string,
+          subject: `Your invite to ${(client.packages as unknown as Record<string, unknown>)?.title ?? 'a coaching program'}`,
+          html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
+        });
+      }
+      return { success: true, message: 'Invite resent', data: { portalUrl } };
+    }
 
     default:
       return { success: false, message: `Unknown action: ${req.action}` };

@@ -2,3 +2,5 @@
 > @coaching/agent-crm@1.0.0 build C:\Repos\skillz-workspace\coaching-platform\packages\agents\05-crm
 > tsc
 
+src/index.ts(7,24): error TS2307: Cannot find module 'resend' or its corresponding type declarations.
+ ELIFECYCLE  Command failed with exit code 2.

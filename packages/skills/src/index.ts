@@ -9,3 +9,5 @@ export * from './bookingSkill';
 export * from './crmSkill';
 export * from './coachLibrarySkill';
 export * from './clientModuleDataSkill';
+export * from './clientsSkill';
+export * from './transcriptionSkill';

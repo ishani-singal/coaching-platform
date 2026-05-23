@@ -1,16 +1,20 @@
 import { callAgentAction, callAgentContext } from './agentBridge';
-import { PaymentLink } from '@coaching/sdk';
+import { PaymentLink, CreatePaymentLinkParams } from '@coaching/sdk';
 
-// Stripe secret key lives inside the skillz payment agent — NOT in this repo
-const ID = 'payment';
+// Routes to the internal coaching-payment agent (port 3007).
+// agentBridge resolves this ID to SKILLZ_AGENT_COACHING_PAYMENT_URL.
+const ID = 'coaching-payment';
 
-export async function createPaymentLink(userId: string, params: {
-  amountUsd: number; description: string; redirectUrl?: string;
-}): Promise<PaymentLink> {
+export async function createPaymentLink(
+  userId: string,
+  params: CreatePaymentLinkParams,
+): Promise<PaymentLink> {
   const r = await callAgentAction(ID, userId, 'create_payment_link', {
-    amount_cents: Math.round(params.amountUsd * 100),
+    amount:       params.amount,
+    currency:     params.currency,
     description:  params.description,
-    redirect_url: params.redirectUrl,
+    redirectUrl:  params.redirectUrl,
+    packageId:    params.packageId,
   });
   return r.data as unknown as PaymentLink;
 }
@@ -20,8 +24,27 @@ export async function getTransactions(userId: string, since?: string) {
   return r.data?.transactions ?? [];
 }
 
-export async function issueRefund(userId: string, paymentIntentId: string, reason?: string) {
-  return callAgentAction(ID, userId, 'refund', { paymentIntentId, reason });
+export async function issueRefund(
+  userId: string,
+  externalId: string,
+  options?: { provider?: string; amountSmallestUnit?: number; reason?: string },
+) {
+  return callAgentAction(ID, userId, 'issue_refund', {
+    externalId,
+    provider:           options?.provider ?? 'stripe',
+    amountSmallestUnit: options?.amountSmallestUnit,
+    reason:             options?.reason,
+  });
+}
+
+export async function getPaymentStatus(userId: string, externalId: string, provider: string) {
+  const r = await callAgentAction(ID, userId, 'get_payment_status', { externalId, provider });
+  return r.data;
+}
+
+export async function getSupportedMethods(userId: string, currency: string) {
+  const r = await callAgentAction(ID, userId, 'get_supported_methods', { currency });
+  return r.data;
 }
 
 export async function getPaymentContext(userId: string) {

@@ -7,10 +7,18 @@ if (!process.env.SUPABASE_URL) {
   config({ path: path.resolve(__dirname, '../../../.env') });
 }
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let _supabase: ReturnType<typeof createClient> | null = null;
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, prop) {
+    if (!_supabase) {
+      _supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return (_supabase as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 export function supabaseAsUser(jwt: string) {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {

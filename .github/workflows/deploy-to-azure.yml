@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+  REGISTRY: coachingplatformprod.azurecr.io
   RESOURCE_GROUP: coaching-platform-prod-rg
   LOCATION: centralus
 

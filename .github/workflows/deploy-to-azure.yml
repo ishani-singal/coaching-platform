@@ -122,7 +122,10 @@ jobs:
             az containerapp update \
               --name coachprod-$i \
               --resource-group ${{ env.RESOURCE_GROUP }} \
-              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest
+              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest \
+              --registry-server ${{ env.REGISTRY }} \
+              --registry-username ${{ needs.acr-creds.outputs.username }} \
+              --registry-password ${{ needs.acr-creds.outputs.password }}
           done
 
   # ── Build & deploy shell (only when shell/shared packages change) ───────────

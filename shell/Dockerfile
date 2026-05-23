@@ -14,11 +14,7 @@ COPY shell ./shell
 RUN npm install -g pnpm@10.33.0
 RUN pnpm install --frozen-lockfile
 
-# Build all packages
-RUN pnpm build
-
-# Build Next.js
-WORKDIR /app/shell
+# Build all packages (turbo builds sdk/tools/skills + shell)
 RUN pnpm build
 
 # Stage 2: Production
@@ -30,7 +26,6 @@ WORKDIR /app
 COPY --from=builder /app/shell/.next ./.next
 COPY --from=builder /app/shell/node_modules ./node_modules
 COPY --from=builder /app/shell/package.json ./
-COPY --from=builder /app/shell/public ./public
 
 EXPOSE 3000
 

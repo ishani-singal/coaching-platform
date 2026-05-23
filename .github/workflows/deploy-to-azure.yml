@@ -174,22 +174,26 @@ jobs:
 
       - name: Build and push shell image
         run: |
+          SHA="${{ github.sha }}"
           docker build \
             -t ${{ env.REGISTRY }}/shell:latest \
+            -t ${{ env.REGISTRY }}/shell:$SHA \
             -f shell/Dockerfile \
             --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
             .
           docker push ${{ env.REGISTRY }}/shell:latest
+          docker push ${{ env.REGISTRY }}/shell:$SHA
 
       - name: Deploy Shell to App Service
         run: |
+          SHA="${{ github.sha }}"
           ACR_USER="${{ needs.acr-creds.outputs.username }}"
           ACR_PASS="${{ needs.acr-creds.outputs.password }}"
           az webapp config container set \
             --name coaching-platform-prod-shell \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --container-image-name ${{ env.REGISTRY }}/shell:latest \
+            --container-image-name ${{ env.REGISTRY }}/shell:$SHA \
             --container-registry-url https://${{ env.REGISTRY }} \
             --container-registry-user "$ACR_USER" \
             --container-registry-password "$ACR_PASS"

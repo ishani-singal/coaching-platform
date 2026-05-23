@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      force_agents:
+        description: 'Force rebuild agents even if no agent files changed'
+        type: boolean
+        default: false
 
 env:
   REGISTRY: coachingplatformprod.azurecr.io
@@ -11,12 +16,64 @@ env:
   LOCATION: centralus
 
 jobs:
-  build:
+  # ── Detect which paths changed ──────────────────────────────────────────────
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.filter.outputs.agents }}
+      shell:  ${{ steps.filter.outputs.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            agents:
+              - 'packages/agents/**'
+              - 'packages/sdk/**'
+              - 'packages/tools/**'
+              - 'packages/skills/**'
+              - 'Dockerfile.agent'
+              - 'pnpm-lock.yaml'
+            shell:
+              - 'shell/**'
+              - 'packages/sdk/**'
+              - 'packages/tools/**'
+              - 'packages/skills/**'
+              - 'shell/Dockerfile'
+              - 'pnpm-lock.yaml'
+
+  # ── Shared ACR login helper (reused by both jobs via outputs) ───────────────
+  acr-creds:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.agents == 'true' || needs.changes.outputs.shell == 'true' || github.event.inputs.force_agents == 'true'
     permissions:
       contents: read
       id-token: write
-    
+    outputs:
+      username: ${{ steps.creds.outputs.username }}
+      password: ${{ steps.creds.outputs.password }}
+    steps:
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Get ACR credentials
+        id: creds
+        run: |
+          ACR_NAME=$(echo "${{ env.REGISTRY }}" | cut -d. -f1)
+          echo "username=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)" >> $GITHUB_OUTPUT
+          echo "password=$(az acr credential show --name "$ACR_NAME" --query 'passwords[0].value' -o tsv)" >> $GITHUB_OUTPUT
+
+  # ── Build & deploy agents (only when agent/shared packages change) ──────────
+  deploy-agents:
+    runs-on: ubuntu-latest
+    needs: [changes, acr-creds]
+    if: needs.changes.outputs.agents == 'true' || github.event.inputs.force_agents == 'true'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -36,14 +93,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Get ACR credentials
-        run: |
-          ACR_NAME=$(echo "${{ env.REGISTRY }}" | cut -d. -f1)
-          ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
-          ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv)
-          echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
-          echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -51,8 +100,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ env.ACR_USERNAME }}
-          password: ${{ env.ACR_PASSWORD }}
+          username: ${{ needs.acr-creds.outputs.username }}
+          password: ${{ needs.acr-creds.outputs.password }}
 
       - name: Build and push agent images
         run: |
@@ -64,6 +113,54 @@ jobs:
               .
             docker push ${{ env.REGISTRY }}/agents/$agent:latest
           done
+
+      - name: Update Container Apps with new images
+        run: |
+          for i in 01 02 03 04 05 06 07; do
+            names=(program-builder program-runner coach-library persona-chat crm licensing payment)
+            idx=$((10#$i - 1))
+            az containerapp update \
+              --name coachprod-$i \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest
+          done
+
+  # ── Build & deploy shell (only when shell/shared packages change) ───────────
+  deploy-shell:
+    runs-on: ubuntu-latest
+    needs: [changes, acr-creds]
+    if: needs.changes.outputs.shell == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to ACR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ needs.acr-creds.outputs.username }}
+          password: ${{ needs.acr-creds.outputs.password }}
 
       - name: Build and push shell image
         run: |
@@ -77,39 +174,3 @@ jobs:
           images: ${{ env.REGISTRY }}/shell:latest
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
 
-      - name: Update Container Apps with new images
-        run: |
-          az containerapp update \
-            --name coachprod-01 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/01-program-builder:latest
-          
-          az containerapp update \
-            --name coachprod-02 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/02-program-runner:latest
-          
-          az containerapp update \
-            --name coachprod-03 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/03-coach-library:latest
-          
-          az containerapp update \
-            --name coachprod-04 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/04-persona-chat:latest
-          
-          az containerapp update \
-            --name coachprod-05 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/05-crm:latest
-          
-          az containerapp update \
-            --name coachprod-06 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/06-licensing:latest
-          
-          az containerapp update \
-            --name coachprod-07 \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/agents/07-payment:latest

@@ -19,11 +19,15 @@ jobs:
   # ── Detect which paths changed ──────────────────────────────────────────────
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       agents: ${{ steps.filter.outputs.agents }}
       shell:  ${{ steps.filter.outputs.shell }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dorny/paths-filter@v3
         id: filter
         with:

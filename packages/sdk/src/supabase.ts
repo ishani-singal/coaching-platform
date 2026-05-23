@@ -7,18 +7,12 @@ if (!process.env.SUPABASE_URL) {
   config({ path: path.resolve(__dirname, '../../../.env') });
 }
 
-let _supabase: ReturnType<typeof createClient> | null = null;
-export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
-  get(_target, prop) {
-    if (!_supabase) {
-      _supabase = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-    }
-    return (_supabase as unknown as Record<string | symbol, unknown>)[prop];
-  },
-});
+// Provide placeholder fallbacks so createClient doesn't throw during Next.js
+// static build ("Collecting page data"). At runtime the real env vars are set.
+export const supabase = createClient(
+  process.env.SUPABASE_URL ?? 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'placeholder-service-key'
+);
 
 export function supabaseAsUser(jwt: string) {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {

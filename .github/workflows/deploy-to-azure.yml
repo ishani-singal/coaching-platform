@@ -121,13 +121,16 @@ jobs:
           for i in 01 02 03 04 05 06 07; do
             names=(program-builder program-runner coach-library persona-chat crm licensing payment)
             idx=$((10#$i - 1))
+            az containerapp registry set \
+              --name coachprod-$i \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --server ${{ env.REGISTRY }} \
+              --username ${{ needs.acr-creds.outputs.username }} \
+              --password ${{ needs.acr-creds.outputs.password }}
             az containerapp update \
               --name coachprod-$i \
               --resource-group ${{ env.RESOURCE_GROUP }} \
-              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest \
-              --registry-server ${{ env.REGISTRY }} \
-              --registry-username ${{ needs.acr-creds.outputs.username }} \
-              --registry-password ${{ needs.acr-creds.outputs.password }}
+              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest
           done
 
   # ── Build & deploy shell (only when shell/shared packages change) ───────────

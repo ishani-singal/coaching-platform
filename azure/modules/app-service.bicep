@@ -30,6 +30,10 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
       nodeVersion: '20-lts'
       appSettings: [
         {
+          name: 'WEBSITES_PORT'
+          value: '3000'
+        }
+        {
           name: 'WEBSITE_NODE_DEFAULT_VERSION'
           value: '20.11.0'
         }

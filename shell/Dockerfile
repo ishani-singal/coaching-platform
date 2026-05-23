@@ -22,14 +22,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy necessary files from builder
-COPY --from=builder /app/shell/.next ./.next
-COPY --from=builder /app/shell/node_modules ./node_modules
-COPY --from=builder /app/shell/package.json ./
+# Standalone output includes all required node_modules (including workspace packages)
+COPY --from=builder /app/shell/.next/standalone ./
+COPY --from=builder /app/shell/.next/static ./shell/.next/static
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
-CMD ["node_modules/.bin/next", "start"]
+CMD ["node", "shell/server.js"]

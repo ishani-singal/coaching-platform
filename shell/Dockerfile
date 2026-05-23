@@ -14,6 +14,12 @@ COPY shell ./shell
 RUN npm install -g pnpm@10.33.0
 RUN pnpm install --frozen-lockfile
 
+# Inject public env vars at build time so Next.js can bake them into the client bundle
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 # Build all packages (turbo builds sdk/tools/skills + shell)
 RUN pnpm build
 

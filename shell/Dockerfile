@@ -20,6 +20,15 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-https://bthacagrowxgbuhlbcng.supabase.co}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-REDACTED_SUPABASE_ANON_KEY}
 
+# Inject server-side Supabase vars at build time so next.config.ts env block bakes real values
+# into the Edge Runtime middleware bundle (process.env is read at compile time, not runtime).
+ARG SUPABASE_URL
+ARG SUPABASE_ANON_KEY
+ARG SUPABASE_SERVICE_ROLE_KEY
+ENV SUPABASE_URL=${SUPABASE_URL:-https://bthacagrowxgbuhlbcng.supabase.co}
+ENV SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-REDACTED_SUPABASE_ANON_KEY}
+ENV SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-REDACTED_SUPABASE_SERVICE_ROLE_KEY}
+
 # Build all packages (turbo builds sdk/tools/skills + shell)
 RUN pnpm build
 

@@ -121,19 +121,38 @@ jobs:
 
       - name: Update Container Apps with new images
         run: |
-          for i in 01 02 03 04 05 06 07; do
-            names=(program-builder program-runner coach-library persona-chat crm licensing payment)
-            idx=$((10#$i - 1))
+          names=(program-builder program-runner coach-library persona-chat crm licensing payment)
+          port_vars=(AGENT_PROGRAM_BUILDER_PORT AGENT_PROGRAM_RUNNER_PORT AGENT_COACH_LIBRARY_PORT AGENT_PERSONA_CHAT_PORT AGENT_CRM_PORT AGENT_LICENSING_PORT AGENT_PAYMENT_PORT)
+          for i in "${!names[@]}"; do
+            idx=$(printf "%02d" $((i + 1)))
             az containerapp registry set \
-              --name coachprod-$i \
+              --name coachprod-$idx \
               --resource-group ${{ env.RESOURCE_GROUP }} \
               --server ${{ env.REGISTRY }} \
               --username ${{ needs.acr-creds.outputs.username }} \
               --password ${{ needs.acr-creds.outputs.password }}
             az containerapp update \
-              --name coachprod-$i \
+              --name coachprod-$idx \
               --resource-group ${{ env.RESOURCE_GROUP }} \
-              --image ${{ env.REGISTRY }}/agents/$i-${names[$idx]}:latest
+              --image ${{ env.REGISTRY }}/agents/$idx-${names[$i]}:latest \
+              --set-env-vars \
+                "${port_vars[$i]}=3000" \
+                "SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+                "SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+                "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+                "SHELL_INTERNAL_TOKEN=${{ secrets.SHELL_INTERNAL_TOKEN }}" \
+                "LLM_PROVIDER=${{ secrets.LLM_PROVIDER }}" \
+                "AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
+                "AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }}" \
+                "AZURE_OPENAI_DEPLOYMENT=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
+                "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
+                "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+                "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" \
+                "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" \
+                "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" \
+                "FROM_EMAIL=${{ secrets.FROM_EMAIL }}" \
+                "PLATFORM_DOMAIN=${{ secrets.PLATFORM_DOMAIN }}" \
+                "PLATFORM_CUT_PCT=${{ secrets.PLATFORM_CUT_PCT }}"
           done
 
   # ── Build & deploy shell (only when shell/shared packages change) ───────────

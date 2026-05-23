@@ -45,11 +45,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body,
+      signal: AbortSignal.timeout(25000),
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e: unknown) {
     const msg = (e as Error).message ?? 'Agent unreachable';
-    return NextResponse.json({ success: false, message: `Agent ${agentId} error: ${msg}` }, { status: 502 });
+    const isTimeout = (e as Error).name === 'TimeoutError';
+    return NextResponse.json(
+      { success: false, message: `Agent ${agentId} error: ${msg}` },
+      { status: isTimeout ? 504 : 502 },
+    );
   }
 }

@@ -37,5 +37,17 @@ RUN npx --yes @vercel/ncc build packages/agents/${AGENT_NAME}/dist/index.js \
 FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /bundle/index.js ./index.js
+
+# All agents listen on 3000 inside the container (matches Container App targetPort: 3000).
+# Local dev overrides these via .env (3001–3007). All vars are set so whichever agent
+# binary is running will find its own port var already pointing to 3000.
+ENV AGENT_PROGRAM_BUILDER_PORT=3000 \
+    AGENT_PROGRAM_RUNNER_PORT=3000 \
+    AGENT_COACH_LIBRARY_PORT=3000 \
+    AGENT_PERSONA_CHAT_PORT=3000 \
+    AGENT_CRM_PORT=3000 \
+    AGENT_LICENSING_PORT=3000 \
+    AGENT_PAYMENT_PORT=3000
+
 EXPOSE 3000
 CMD ["node", "index.js"]

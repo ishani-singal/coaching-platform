@@ -39,4 +39,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
+# Server-side Supabase vars read at runtime by middleware and server components.
+# Defaults baked into image so the container works even if App Service settings are missing.
+ARG SUPABASE_URL
+ARG SUPABASE_ANON_KEY
+ENV SUPABASE_URL=${SUPABASE_URL:-https://bthacagrowxgbuhlbcng.supabase.co}
+ENV SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-REDACTED_SUPABASE_ANON_KEY}
+
 CMD ["node", "shell/server.js"]

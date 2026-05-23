@@ -35,6 +35,7 @@ jobs:
               - 'packages/skills/**'
               - 'Dockerfile.agent'
               - 'pnpm-lock.yaml'
+              - '.github/workflows/**'
             shell:
               - 'shell/**'
               - 'packages/sdk/**'
@@ -42,6 +43,7 @@ jobs:
               - 'packages/skills/**'
               - 'shell/Dockerfile'
               - 'pnpm-lock.yaml'
+              - '.github/workflows/**'
 
   # ── Shared ACR login helper (reused by both jobs via outputs) ───────────────
   acr-creds:

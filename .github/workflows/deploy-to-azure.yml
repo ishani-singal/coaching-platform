@@ -9,6 +9,10 @@ on:
         description: 'Force rebuild agents even if no agent files changed'
         type: boolean
         default: false
+      force_shell:
+        description: 'Force rebuild shell even if no shell files changed'
+        type: boolean
+        default: false
 
 env:
   REGISTRY: coachingplatformprod.azurecr.io
@@ -53,7 +57,7 @@ jobs:
   acr-creds:
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.agents == 'true' || needs.changes.outputs.shell == 'true' || github.event.inputs.force_agents == 'true'
+    if: needs.changes.outputs.agents == 'true' || needs.changes.outputs.shell == 'true' || github.event.inputs.force_agents == 'true' || github.event.inputs.force_shell == 'true'
     permissions:
       contents: read
       id-token: write
@@ -147,19 +151,29 @@ jobs:
                 "AZURE_OPENAI_DEPLOYMENT=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
                 "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
                 "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+                "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" \
                 "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" \
                 "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" \
                 "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" \
                 "FROM_EMAIL=${{ secrets.FROM_EMAIL }}" \
                 "PLATFORM_DOMAIN=${{ secrets.PLATFORM_DOMAIN }}" \
-                "PLATFORM_CUT_PCT=${{ secrets.PLATFORM_CUT_PCT }}"
+                "PLATFORM_CUT_PCT=${{ secrets.PLATFORM_CUT_PCT }}" \
+                "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \
+                "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+                "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+                "RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}" \
+                "RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}" \
+                "RAZORPAY_WEBHOOK_SECRET=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
+                "SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL=${{ secrets.SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL }}" \
+                "SKILLZ_AGENT_CUSTOMER_BOOKING_URL=${{ secrets.SKILLZ_AGENT_CUSTOMER_BOOKING_URL }}" \
+                "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}"
           done
 
   # ── Build & deploy shell (only when shell/shared packages change) ───────────
   deploy-shell:
     runs-on: ubuntu-latest
     needs: [changes, acr-creds]
-    if: needs.changes.outputs.shell == 'true'
+    if: needs.changes.outputs.shell == 'true' || github.event.inputs.force_shell == 'true'
     permissions:
       contents: read
       id-token: write
@@ -220,6 +234,41 @@ jobs:
             --name coaching-platform-prod-shell \
             --resource-group ${{ env.RESOURCE_GROUP }}
 
+      - name: Set App Service env vars
+        run: |
+          az webapp config appsettings set \
+            --name coaching-platform-prod-shell \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --settings \
+              "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+              "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+              "SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+              "SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+              "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              "SHELL_INTERNAL_TOKEN=${{ secrets.SHELL_INTERNAL_TOKEN }}" \
+              "LLM_PROVIDER=${{ secrets.LLM_PROVIDER }}" \
+              "AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
+              "AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }}" \
+              "AZURE_OPENAI_DEPLOYMENT=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
+              "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
+              "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+              "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" \
+              "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" \
+              "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" \
+              "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" \
+              "FROM_EMAIL=${{ secrets.FROM_EMAIL }}" \
+              "PLATFORM_DOMAIN=${{ secrets.PLATFORM_DOMAIN }}" \
+              "PLATFORM_CUT_PCT=${{ secrets.PLATFORM_CUT_PCT }}" \
+              "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \
+              "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+              "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+              "RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}" \
+              "RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}" \
+              "RAZORPAY_WEBHOOK_SECRET=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
+              "SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL=${{ secrets.SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL }}" \
+              "SKILLZ_AGENT_CUSTOMER_BOOKING_URL=${{ secrets.SKILLZ_AGENT_CUSTOMER_BOOKING_URL }}" \
+              "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}"
+
       - name: Set agent URLs on App Service
         run: |
           set -e
@@ -233,6 +282,11 @@ jobs:
               --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || echo "")
             if [ -n "$fqdn" ]; then
               SETTINGS+=("${ENV_KEYS[$i]}=https://${fqdn}")
+              # Also set PAYMENT_AGENT_URL alias for the portal pay route
+              if [ "${ENV_KEYS[$i]}" = "AGENT_PAYMENT_URL" ]; then
+                SETTINGS+=("PAYMENT_AGENT_URL=https://${fqdn}")
+                SETTINGS+=("SKILLZ_AGENT_COACHING_PAYMENT_URL=https://${fqdn}")
+              fi
             fi
           done
           if [ ${#SETTINGS[@]} -gt 0 ]; then

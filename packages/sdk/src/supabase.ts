@@ -16,7 +16,7 @@ export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
     }
-    return (_supabase as Record<string | symbol, unknown>)[prop];
+    return (_supabase as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
 

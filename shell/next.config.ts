@@ -10,11 +10,12 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../'),
   transpilePackages: ['@coaching/sdk', '@coaching/tools', '@coaching/skills'],
   env: {
-    PLATFORM_DOMAIN:          process.env.PLATFORM_DOMAIN ?? '',
-    SUPABASE_URL:             process.env.SUPABASE_URL ?? '',
-    SUPABASE_ANON_KEY:        process.env.SUPABASE_ANON_KEY ?? '',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
-    SHELL_INTERNAL_TOKEN:     process.env.SHELL_INTERNAL_TOKEN ?? '',
+    // Only PLATFORM_DOMAIN needs build-time baking (used in Edge Runtime middleware for subdomain routing).
+    // Supabase/auth vars are accessed in middleware via NEXT_PUBLIC_* (already baked in Dockerfile Stage 1).
+    // Server component vars (SUPABASE_SERVICE_ROLE_KEY, SHELL_INTERNAL_TOKEN) are intentionally omitted
+    // here so Next.js does NOT replace them with empty strings — they are read at runtime from
+    // App Service application settings.
+    PLATFORM_DOMAIN: process.env.PLATFORM_DOMAIN ?? '',
   },
 };
 

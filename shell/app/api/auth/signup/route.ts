@@ -11,22 +11,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-
-  if (error) {
-    // Surface the Supabase error (e.g. "User already registered") to the client.
-    return NextResponse.json({ error: error.message }, { status: error.status ?? 400 });
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('[signup] Missing env vars: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
   }
 
-  return NextResponse.json({ id: data.user.id }, { status: 201 });
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (error) {
+      // Surface the Supabase error (e.g. "User already registered") to the client.
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 400 });
+    }
+
+    return NextResponse.json({ id: data.user.id }, { status: 201 });
+  } catch (e: unknown) {
+    console.error('[signup] Unexpected error:', e);
+    return NextResponse.json({ error: (e as Error).message ?? 'Signup failed.' }, { status: 500 });
+  }
 }

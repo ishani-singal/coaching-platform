@@ -1838,18 +1838,26 @@ function ProgramModal({
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                disabled={!newModuleTitle.trim() || creatingModuleBusy || !existing}
+                                disabled={!newModuleTitle.trim() || creatingModuleBusy}
                                 onClick={async () => {
-                                  if (!existing || !newModuleTitle.trim()) return;
+                                  if (!newModuleTitle.trim()) return;
                                   setCreatingModuleBusy(true);
                                   const displayOrder = period.modules.length;
-                                  const r = await callAction('create_inline_module', {
-                                    programId:    existing.programId,
-                                    periodOrder:  period.periodOrder,
-                                    title:        newModuleTitle.trim(),
-                                    category:     '',
-                                    displayOrder,
-                                  }) as { success: boolean; data?: { moduleId: string; title: string; category: string } };
+                                  let r: { success: boolean; data?: { moduleId: string; title: string; category: string } };
+                                  if (isNew) {
+                                    r = await callAction('create_module', {
+                                      title:    newModuleTitle.trim(),
+                                      category: '',
+                                    }) as typeof r;
+                                  } else {
+                                    r = await callAction('create_inline_module', {
+                                      programId:    existing!.programId,
+                                      periodOrder:  period.periodOrder,
+                                      title:        newModuleTitle.trim(),
+                                      category:     '',
+                                      displayOrder,
+                                    }) as typeof r;
+                                  }
                                   if (r.success && r.data) {
                                     const newMod = { moduleId: r.data.moduleId, title: r.data.title, category: r.data.category };
                                     setPeriods(prev => prev.map(p => p.periodOrder === period.periodOrder
@@ -1888,7 +1896,7 @@ function ProgramModal({
                               }}
                             >
                               <option value="">Pick a module…</option>
-                              {!isNew && <option value="__create__">✦ Create new module</option>}
+                              <option value="__create__">✦ Create new module</option>
                               {allModules.filter(m => !period.modules.some(pm => pm.moduleId === m.moduleId)).map(m => (
                                 <option key={m.moduleId} value={m.moduleId}>{m.title}</option>
                               ))}

@@ -6,8 +6,8 @@ import { ThemeToggle } from './ThemeToggle';
 import { ModelPicker } from './ModelPicker';
 
 const LEFT_NAV = [
-  { href: '/programs?tab=packages', label: 'Packages' },
   { href: '/programs?tab=programs', label: 'Programs' },
+  { href: '/programs?tab=packages', label: 'Packages' },
   { href: '/library',               label: 'Library'  },
   { href: '/persona',               label: 'Chat'     },
   { href: '/booking',               label: 'Booking'  },
@@ -28,7 +28,7 @@ export function Navbar({ email }: NavbarProps) {
       const [hrefPath, hrefQuery] = href.split('?');
       if (pathname !== hrefPath) return false;
       const tab = new URLSearchParams(hrefQuery).get('tab');
-      const currentTab = searchParams.get('tab') ?? 'packages';
+      const currentTab = searchParams.get('tab') ?? 'programs';
       return currentTab === tab;
     }
     return href === '/' ? pathname === '/' : pathname.startsWith(href);

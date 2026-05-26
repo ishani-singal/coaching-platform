@@ -76,6 +76,7 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
   const [enrollOpen,   setEnrollOpen]   = useState(false);
   const [enrollForm,   setEnrollForm]   = useState({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });
   const [enrollStatus, setEnrollStatus] = useState('');
+  const [enrollPortalUrl, setEnrollPortalUrl] = useState('');
   const [licenseOpen,      setLicenseOpen]      = useState(false);
   const [licenseForm,      setLicenseForm]      = useState({ programId: '', licenseeEmail: '', licenseFeeAmount: '', licenseFeeCurrency: 'USD' });
   const [licenseStatus,    setLicenseStatus]    = useState('');
@@ -620,6 +621,7 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
               onSubmit={async e => {
                 e.preventDefault();
                 setEnrollStatus('');
+                setEnrollPortalUrl('');
                 const r = await fetch('/api/agents/coaching-program-runner/action', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -630,7 +632,15 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                   } }),
                 }).then(res => res.json()) as { success: boolean; message: string; data: { portalUrl: string } };
                 if (r.success) {
-                  setEnrollStatus(`✓ Enrolled — Portal: ${r.data?.portalUrl}`);
+                  setEnrollStatus('✓ Enrolled successfully');
+                  if (r.data?.portalUrl) {
+                    try {
+                      const parsed = new URL(r.data.portalUrl);
+                      setEnrollPortalUrl(window.location.origin + parsed.pathname);
+                    } catch {
+                      setEnrollPortalUrl(window.location.origin + '/portal');
+                    }
+                  }
                   setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });
                 } else {
                   setEnrollStatus(`✗ ${r.message}`);
@@ -734,11 +744,23 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                 );
               })()}
               {enrollStatus && (
-                <p className={`text-xs break-all rounded-lg px-3 py-2 ${
+                <div className={`text-xs break-all rounded-lg px-3 py-2 ${
                   enrollStatus.startsWith('✓')
                     ? 'bg-green-50 text-green-700 border border-green-100'
                     : 'bg-red-50 text-red-700 border border-red-100'
-                }`}>{enrollStatus}</p>
+                }`}>
+                  <p>{enrollStatus}</p>
+                  {enrollPortalUrl && (
+                    <a
+                      href={enrollPortalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-medium mt-1 inline-block"
+                    >
+                      Open Client Portal →
+                    </a>
+                  )}
+                </div>
               )}
               <button
                 type="submit"

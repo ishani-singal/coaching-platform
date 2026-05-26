@@ -167,10 +167,10 @@ jobs:
                 "SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL=${{ secrets.SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL }}" \
                 "SKILLZ_AGENT_CUSTOMER_BOOKING_URL=${{ secrets.SKILLZ_AGENT_CUSTOMER_BOOKING_URL }}" \
                 "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}" \
-              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
-              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-              "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" \
-              "GMAIL_REDIRECT_URI=${{ secrets.GMAIL_REDIRECT_URI }}"
+                "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+                "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+                "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" \
+                "GMAIL_REDIRECT_URI=${{ secrets.GMAIL_REDIRECT_URI }}"
           done
 
   # ---- Build and deploy shell ----

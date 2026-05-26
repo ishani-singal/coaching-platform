@@ -638,7 +638,7 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                       const parsed = new URL(r.data.portalUrl);
                       setEnrollPortalUrl(window.location.origin + parsed.pathname);
                     } catch {
-                      setEnrollPortalUrl(window.location.origin + '/portal');
+                      setEnrollPortalUrl('');
                     }
                   }
                   setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });

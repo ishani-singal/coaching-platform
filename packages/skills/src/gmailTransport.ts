@@ -23,10 +23,44 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
 }
 
 /**
+ * Send via Resend SMTP relay using nodemailer (fallback when no Gmail connection).
+ * Uses RESEND_API_KEY + FROM_EMAIL env vars.
+ */
+async function sendViaResendSmtp(options: SendMailOptions & { replyTo?: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from   = process.env.FROM_EMAIL ?? 'noreply@example.com';
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.resend.com',
+    port: 465,
+    secure: true,
+    auth: { user: 'resend', pass: apiKey },
+  });
+
+  await transporter.sendMail({
+    from,
+    to:      options.to,
+    subject: options.subject,
+    html:    options.html,
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+  });
+
+  process.stdout.write(`[resend-smtp] Email sent to ${options.to}\n`);
+}
+
+/**
  * Send an email from a coach's connected Gmail account.
- * If the coach has no Gmail connection, logs and returns without throwing.
+ * Falls back to Resend SMTP if the coach has no Gmail connection.
  */
 export async function sendFromCoach(coachId: string, options: SendMailOptions): Promise<void> {
+  // Look up coach email for Reply-To even if using fallback
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('email')
+    .eq('user_id', coachId)
+    .maybeSingle();
+
   const { data: conn } = await supabase
     .from('coach_gmail_connections')
     .select('google_account_email, access_token, refresh_token, token_expiry')
@@ -34,7 +68,8 @@ export async function sendFromCoach(coachId: string, options: SendMailOptions): 
     .single();
 
   if (!conn) {
-    process.stdout.write(`[gmail] No Gmail connection for coach ${coachId}, skipping email to ${options.to}\n`);
+    process.stdout.write(`[gmail] No Gmail connection for coach ${coachId}, falling back to Resend SMTP\n`);
+    await sendViaResendSmtp({ ...options, replyTo: profile?.email ?? undefined });
     return;
   }
 

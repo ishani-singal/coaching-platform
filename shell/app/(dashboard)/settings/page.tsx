@@ -31,8 +31,6 @@ export default function SettingsPage() {
   const [isExistingProfile, setIsExistingProfile] = useState(false);
 
   const [channelUrl, setChannelUrl] = useState('');
-  const [channelSaved, setChannelSaved] = useState('');
-  const [channelSaving, setChannelSaving] = useState(false);
 
   const [linkedin, setLinkedin] = useState('');
   const [instagram, setInstagram] = useState('');
@@ -41,8 +39,6 @@ export default function SettingsPage() {
 
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [logoSaved, setLogoSaved] = useState('');
   const logoFileRef = useRef<HTMLInputElement>(null);
 
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -108,6 +104,20 @@ export default function SettingsPage() {
     setProfileStatus('');
 
     try {
+      // Upload logo first if a new file was selected
+      let finalLogoUrl = logoUrl;
+      if (logoFile) {
+        const supabase = createClient();
+        const ext = logoFile.name.split('.').pop() ?? 'bin';
+        const filePath = `logos/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('library-files').upload(filePath, logoFile);
+        if (upErr) throw new Error(upErr.message);
+        const { data: urlData } = supabase.storage.from('library-files').getPublicUrl(filePath);
+        finalLogoUrl = urlData.publicUrl;
+        setLogoUrl(finalLogoUrl);
+        setLogoFile(null);
+      }
+
       if (!isExistingProfile) {
         // First time: run full upgrade (LLM persona init, package seeding)
         const r = await fetch('/api/coaches/upgrade', {
@@ -122,14 +132,11 @@ export default function SettingsPage() {
         }
         setIsExistingProfile(true);
 
-        // Save coaching type if selected
-        if (coachingType) {
-          await fetch('/api/coaches/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, coachingType }),
-          });
-        }
+        await fetch('/api/coaches/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, coachingType: coachingType || undefined, logo: finalLogoUrl || null }),
+        });
 
         setProfileStatus(`✓ Profile created! Your site: ${r.data?.subdomainUrl}`);
       } else {
@@ -137,68 +144,47 @@ export default function SettingsPage() {
         const r = await fetch('/api/coaches/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, displayName, slug, bio: bio || undefined, coachingType: coachingType || undefined, customDomain: customDomain || undefined }),
+          body: JSON.stringify({ userId, displayName, slug, bio: bio || undefined, coachingType: coachingType || undefined, customDomain: customDomain || undefined, logo: finalLogoUrl || null }),
         }).then(r => r.json()) as { success: boolean; message?: string };
 
         setProfileStatus(r.success ? '✓ Profile saved' : `✗ Failed: ${r.message}`);
       }
+    } catch (err) {
+      setProfileStatus(`✗ ${(err as Error).message}`);
     } finally {
       setProfileSaving(false);
-    }
-  }
-
-  async function saveLogo(e: React.FormEvent) {
-    e.preventDefault();
-    setLogoUploading(true);
-    setLogoSaved('');
-    try {
-      let finalUrl = logoUrl;
-      if (logoFile) {
-        const supabase = createClient();
-        const ext = logoFile.name.split('.').pop() ?? 'bin';
-        const filePath = `logos/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('library-files').upload(filePath, logoFile);
-        if (upErr) throw new Error(upErr.message);
-        const { data: urlData } = supabase.storage.from('library-files').getPublicUrl(filePath);
-        finalUrl = urlData.publicUrl;
-        setLogoUrl(finalUrl);
-        setLogoFile(null);
-      }
-      const r = await fetch('/api/coaches/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, logo: finalUrl || null }),
-      }).then(r => r.json()) as { success: boolean; message?: string };
-      setLogoSaved(r.success ? '✓ Logo saved' : `✗ Failed: ${r.message}`);
-    } catch (err) {
-      setLogoSaved(`✗ ${(err as Error).message}`);
-    } finally {
-      setLogoUploading(false);
     }
   }
 
   async function saveSocial(e: React.FormEvent) {
     e.preventDefault();
     setSocialSaving(true); setSocialSaved('');
-    const r = await fetch('/api/coaches/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, socialMedia: { linkedin: linkedin || undefined, instagram: instagram || undefined } }),
-    }).then(r => r.json()) as { success: boolean; message?: string };
-    setSocialSaving(false);
-    setSocialSaved(r.success ? '✓ Social profiles saved' : `✗ Failed: ${r.message}`);
-  }
+    try {
+      const r = await fetch('/api/coaches/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, socialMedia: { linkedin: linkedin || undefined, instagram: instagram || undefined } }),
+      }).then(r => r.json()) as { success: boolean; message?: string };
 
-  async function saveChannel(e: React.FormEvent) {
-    e.preventDefault();
-    setChannelSaving(true); setChannelSaved('');
-    const r = await fetch(AGENT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, action: 'save_youtube_channel', params: { channelUrl } }),
-    }).then(r => r.json()) as { success: boolean; message?: string };
-    setChannelSaving(false);
-    setChannelSaved(r.success ? '✓ Channel saved' : `✗ Failed: ${r.message}`);
+      if (!r.success) {
+        setSocialSaved(`✗ Failed: ${r.message}`);
+        return;
+      }
+
+      // Also save YouTube channel if provided
+      if (channelUrl.trim()) {
+        const rc = await fetch(AGENT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action: 'save_youtube_channel', params: { channelUrl } }),
+        }).then(r => r.json()) as { success: boolean; message?: string };
+        setSocialSaved(rc.success ? '✓ Social profiles saved' : `✗ Channel: ${rc.message}`);
+      } else {
+        setSocialSaved('✓ Social profiles saved');
+      }
+    } finally {
+      setSocialSaving(false);
+    }
   }
 
   async function disconnectGmail() {
@@ -274,6 +260,47 @@ export default function SettingsPage() {
                   ))}
                 </select>
               </div>
+              <hr className="border-gray-100" />
+
+              <div>
+                <label className="text-xs text-gray-500 uppercase">Brand Logo</label>
+                <p className="text-xs text-gray-400 mb-2">Automatically included on certificates you issue. PNG, JPG or SVG.</p>
+                <div className="flex items-center gap-3">
+                  {logoUrl && (
+                    <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain rounded border border-gray-200 bg-gray-50" />
+                  )}
+                  <div className="flex-1 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => logoFileRef.current?.click()}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                    >
+                      {logoFile ? logoFile.name : 'Choose file…'}
+                    </button>
+                    <input
+                      ref={logoFileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const f = e.target.files?.[0] ?? null;
+                        setLogoFile(f);
+                        if (f) setLogoUrl(URL.createObjectURL(f));
+                      }}
+                    />
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => { setLogoUrl(''); setLogoFile(null); }}
+                        className="text-xs text-red-500 hover:text-red-700 px-2"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={profileSaving}
@@ -282,60 +309,6 @@ export default function SettingsPage() {
                 {profileSaving ? 'Saving…' : isExistingProfile ? 'Save Profile' : 'Create Coach Profile'}
               </button>
               {profileStatus && <p className="text-sm text-green-700 break-all">{profileStatus}</p>}
-            </form>
-          )}
-
-          <hr className="my-5 border-gray-100" />
-
-          <h2 className="font-semibold mb-1">Brand Logo</h2>
-          <p className="text-xs text-gray-500 mb-4">Your logo is automatically included on certificates you issue.</p>
-          {profileLoading ? (
-            <p className="text-sm text-gray-400">Loading…</p>
-          ) : (
-            <form onSubmit={saveLogo} className="space-y-3">
-              <div className="flex items-center gap-3">
-                {logoUrl && (
-                  <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain rounded border border-gray-200 bg-gray-50" />
-                )}
-                <div className="flex-1 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => logoFileRef.current?.click()}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-                  >
-                    {logoFile ? logoFile.name : 'Choose file…'}
-                  </button>
-                  <input
-                    ref={logoFileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={e => {
-                      const f = e.target.files?.[0] ?? null;
-                      setLogoFile(f);
-                      if (f) setLogoUrl(URL.createObjectURL(f));
-                    }}
-                  />
-                  {logoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => { setLogoUrl(''); setLogoFile(null); }}
-                      className="text-xs text-red-500 hover:text-red-700 px-2"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">PNG, JPG or SVG. Transparent background recommended.</p>
-              <button
-                type="submit"
-                disabled={logoUploading}
-                className="bg-indigo-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
-              >
-                {logoUploading ? 'Saving…' : 'Save Logo'}
-              </button>
-              {logoSaved && <p className="text-sm text-green-700">{logoSaved}</p>}
             </form>
           )}
 
@@ -377,24 +350,8 @@ export default function SettingsPage() {
                   onChange={e => setInstagram(e.target.value)}
                 />
               </div>
-              <button type="submit" disabled={socialSaving}
-                className="bg-indigo-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
-                {socialSaving ? 'Saving...' : 'Save Social Profiles'}
-              </button>
-              {socialSaved && <p className="text-sm text-green-700">{socialSaved}</p>}
-            </form>
-          )}
-
-          <hr className="my-5 border-gray-100" />
-
-          <h2 className="font-semibold mb-1">YouTube Channel</h2>
-          <p className="text-xs text-gray-500 mb-4">Connect your YouTube channel to pick videos when building module sections.</p>
-          {profileLoading ? (
-            <p className="text-sm text-gray-400">Loading...</p>
-          ) : (
-            <form onSubmit={saveChannel} className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 uppercase">Channel URL</label>
+                <label className="text-xs text-gray-500 uppercase">YouTube Channel URL</label>
                 <input
                   className="w-full border rounded px-3 py-2 text-sm mt-1"
                   placeholder="https://www.youtube.com/@YourChannel"
@@ -403,11 +360,11 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">Supports /@handle, /channel/ID, and /c/name formats.</p>
               </div>
-              <button type="submit" disabled={!channelUrl.trim() || channelSaving}
-                className="bg-indigo-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
-                {channelSaving ? 'Saving...' : 'Save Channel'}
+              <button type="submit" disabled={socialSaving}
+                className="bg-indigo-600 text-white px-4 py-2 rounded text-sm w-full disabled:opacity-50">
+                {socialSaving ? 'Saving...' : 'Save Social Profiles'}
               </button>
-              {channelSaved && <p className="text-sm text-green-700">{channelSaved}</p>}
+              {socialSaved && <p className="text-sm text-green-700">{socialSaved}</p>}
             </form>
           )}
         </div>

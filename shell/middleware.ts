@@ -41,8 +41,9 @@ export async function middleware(req: NextRequest) {
   }
 
   // Subdomain: john.coachplatform.com → /coaches/john
-  const sub = host.match(new RegExp(`^([a-z0-9-]+)\\.${DOMAIN.replace(/\./g, '\\.')}$`));
-  if (sub && sub[1] !== 'www' && sub[1] !== 'app') {
+  // Skip rewrite for /portal routes so client portal links work from subdomain dashboards
+  const sub = host.match(new RegExp(`^([a-z0-9-]+)\.${DOMAIN.replace(/\./g, '\\.')}$`));
+  if (sub && sub[1] !== 'www' && sub[1] !== 'app' && !url.pathname.startsWith('/portal')) {
     url.pathname = `/coaches/${sub[1]}${url.pathname === '/' ? '' : url.pathname}`;
     return NextResponse.rewrite(url);
   }

@@ -11,3 +11,4 @@ export * from './coachLibrarySkill';
 export * from './clientModuleDataSkill';
 export * from './clientsSkill';
 export * from './transcriptionSkill';
+export * from './gmailTransport';

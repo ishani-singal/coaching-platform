@@ -325,7 +325,7 @@ importers:
         specifier: ^0.24.0
         version: 0.24.1
       nodemailer:
-        specifier: ^6.10.1
+        specifier: ^6.9.0
         version: 6.10.1
       openai:
         specifier: ^4.104.0

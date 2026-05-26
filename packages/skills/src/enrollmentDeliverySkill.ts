@@ -1,4 +1,3 @@
-import { sendEmail } from './mailer';
 import { ClientProfile, ModuleSectionSpec, EnrollmentType } from '@coaching/sdk';
 import {
   upsertClientProfile,
@@ -12,6 +11,7 @@ import {
 } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
 import { computeAndWriteRevenue } from './licensingSkill';
+import { sendFromCoach } from './gmailTransport';
 
 export async function enrollClient(
   packageId: string,
@@ -76,20 +76,11 @@ export async function enrollClient(
   const protocol = domain.startsWith('localhost') ? 'http' : 'https';
   const portalUrl = `${protocol}://${domain}/portal/${client.inviteToken}`;
 
-  // Look up coach email to use as Reply-To
-  const { data: coachRow } = await supabase
-    .from('user_profiles')
-    .select('email')
-    .eq('user_id', coachId)
-    .maybeSingle();
-  const coachEmail = (coachRow?.email as string | undefined) ?? undefined;
-
   try {
-    await sendEmail({
+    await sendFromCoach(coachId, {
       to:      client.email,
       subject: `You've been invited to ${pkgData?.title ?? 'a coaching program'}`,
-      html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
-      replyTo: coachEmail,
+      html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your coaching program.</p>`,
     });
   } catch (emailErr) {
     process.stdout.write(`[enrollClient] email failed: ${String(emailErr)}\n`);

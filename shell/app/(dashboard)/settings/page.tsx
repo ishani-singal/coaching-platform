@@ -45,6 +45,12 @@ export default function SettingsPage() {
   const [logoSaved, setLogoSaved] = useState('');
   const logoFileRef = useRef<HTMLInputElement>(null);
 
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [gmailLoading, setGmailLoading] = useState(true);
+  const [gmailDisconnecting, setGmailDisconnecting] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState('');
+
   useEffect(() => {
     if (!userId) return;
 
@@ -67,6 +73,26 @@ export default function SettingsPage() {
       })
       .finally(() => setProfileLoading(false));
   }, [userId]);
+
+  useEffect(() => {
+    fetch('/api/auth/gmail/status')
+      .then(r => r.json())
+      .then((d: { connected: boolean; email: string | null }) => {
+        setGmailConnected(d.connected);
+        setGmailEmail(d.email);
+      })
+      .finally(() => setGmailLoading(false));
+
+    // Handle OAuth callback result in URL params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('gmail_connected') === '1') {
+      setGmailStatus('✓ Gmail connected successfully');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('gmail_error')) {
+      setGmailStatus(`✗ Connection failed: ${params.get('gmail_error')}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   async function checkSlug() {
     if (!slug) return;
@@ -173,6 +199,19 @@ export default function SettingsPage() {
     }).then(r => r.json()) as { success: boolean; message?: string };
     setChannelSaving(false);
     setChannelSaved(r.success ? '✓ Channel saved' : `✗ Failed: ${r.message}`);
+  }
+
+  async function disconnectGmail() {
+    setGmailDisconnecting(true);
+    const r = await fetch('/api/auth/gmail/disconnect', { method: 'POST' }).then(r => r.json()) as { success?: boolean; error?: string };
+    setGmailDisconnecting(false);
+    if (r.success) {
+      setGmailConnected(false);
+      setGmailEmail(null);
+      setGmailStatus('Gmail disconnected');
+    } else {
+      setGmailStatus(`✗ Failed: ${r.error}`);
+    }
   }
 
   return (
@@ -354,6 +393,41 @@ export default function SettingsPage() {
             </button>
             {channelSaved && <p className="text-sm text-green-700">{channelSaved}</p>}
           </form>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-6 max-w-lg">
+        <h2 className="font-semibold mb-1">Gmail for Sending Emails</h2>
+        <p className="text-xs text-gray-500 mb-4">Connect your Gmail account to send enrollment invites and nudges directly from your own email address.</p>
+        {gmailLoading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : gmailConnected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+              <span className="text-green-600 text-sm">✓ Connected as <strong>{gmailEmail}</strong></span>
+            </div>
+            <button
+              type="button"
+              onClick={disconnectGmail}
+              disabled={gmailDisconnecting}
+              className="border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded text-sm disabled:opacity-50"
+            >
+              {gmailDisconnecting ? 'Disconnecting…' : 'Disconnect Gmail'}
+            </button>
+          </div>
+        ) : (
+          <a
+            href="/api/auth/gmail"
+            className="inline-flex items-center gap-2 bg-white border border-gray-300 hover:border-indigo-400 hover:text-indigo-600 text-gray-700 px-4 py-2 rounded text-sm font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="currentColor"/>
+            </svg>
+            Connect Gmail
+          </a>
+        )}
+        {gmailStatus && (
+          <p className={`text-xs mt-3 ${gmailStatus.startsWith('✓') ? 'text-green-700' : 'text-red-600'}`}>{gmailStatus}</p>
         )}
       </div>
 

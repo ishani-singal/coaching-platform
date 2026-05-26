@@ -1,8 +1,8 @@
 import { createAgentServer, AgentManifest, ContextRequest, ActionRequest } from '@coaching/sdk';
 import { configureBridge } from '@coaching/tools';
-import { Resend } from 'resend';
 import {
   enrollClient, getCoachDashboard, getCoachEnrollmentStats, completeSection, getModuleView,
+  sendFromCoach,
 } from '@coaching/skills';
 import { completeEnrollment, getEnrollmentWithProgress } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
@@ -125,12 +125,12 @@ async function onAction(req: ActionRequest) {
         .select('invite_token, email, name, packages(title)')
         .eq('client_id', p.clientId)
         .single();
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      await resend.emails.send({
-        from:    process.env.FROM_EMAIL ?? 'noreply@coachplatform.com',
+      const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+      const protocol = domain.startsWith('localhost') ? 'http' : 'https';
+      await sendFromCoach(uid, {
         to:      client?.email as string,
         subject: `Your next module in ${(client?.packages as unknown as Record<string, unknown>)?.title} is ready`,
-        html:    `<p>Hi ${client?.name}, ${p.message ?? 'Keep going — your next module awaits!'}</p><a href="https://${process.env.PLATFORM_DOMAIN}/portal/${client?.invite_token}">Continue learning</a>`,
+        html:    `<p>Hi ${client?.name}, ${p.message ?? 'Keep going — your next module awaits!'}</p><a href="${protocol}://${domain}/portal/${client?.invite_token}">Continue learning</a>`,
       });
       return { success: true, message: 'Nudge sent' };
     }
@@ -153,15 +153,11 @@ async function onAction(req: ActionRequest) {
       const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
       const protocol = domain.startsWith('localhost') ? 'http' : 'https';
       const portalUrl = `${protocol}://${domain}/portal/${client.invite_token}`;
-      if (process.env.RESEND_API_KEY) {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        await resend.emails.send({
-          from:    process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
-          to:      client.email as string,
-          subject: `Your invite to ${(client.packages as unknown as Record<string, unknown>)?.title ?? 'a coaching program'}`,
-          html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
-        });
-      }
+      await sendFromCoach(uid, {
+        to:      client.email as string,
+        subject: `Your invite to ${(client.packages as unknown as Record<string, unknown>)?.title ?? 'a coaching program'}`,
+        html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
+      });
       return { success: true, message: 'Invite resent', data: { portalUrl } };
     }
 

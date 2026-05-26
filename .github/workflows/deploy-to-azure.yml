@@ -20,7 +20,7 @@ env:
   LOCATION: centralus
 
 jobs:
-  # ── Detect which paths changed ──────────────────────────────────────────────
+  # Ã¢â€â‚¬Ã¢â€â‚¬ Detect which paths changed Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -53,7 +53,7 @@ jobs:
               - 'pnpm-lock.yaml'
               - '.github/workflows/**'
 
-  # ── Shared ACR login helper (reused by both jobs via outputs) ───────────────
+  # Ã¢â€â‚¬Ã¢â€â‚¬ Shared ACR login helper (reused by both jobs via outputs) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   acr-creds:
     runs-on: ubuntu-latest
     needs: changes
@@ -76,7 +76,7 @@ jobs:
           echo "username=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)" >> $GITHUB_OUTPUT
           echo "password=$(az acr credential show --name "$ACR_NAME" --query 'passwords[0].value' -o tsv)" >> $GITHUB_OUTPUT
 
-  # ── Build & deploy agents (only when agent/shared packages change) ──────────
+  # Ã¢â€â‚¬Ã¢â€â‚¬ Build & deploy agents (only when agent/shared packages change) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   deploy-agents:
     runs-on: ubuntu-latest
     needs: [changes, acr-creds]
@@ -166,10 +166,14 @@ jobs:
                 "RAZORPAY_WEBHOOK_SECRET=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
                 "SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL=${{ secrets.SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL }}" \
                 "SKILLZ_AGENT_CUSTOMER_BOOKING_URL=${{ secrets.SKILLZ_AGENT_CUSTOMER_BOOKING_URL }}" \
-                "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}"
+                "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}" \
+              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" \
+              "GMAIL_REDIRECT_URI=${{ secrets.GMAIL_REDIRECT_URI }}"
           done
 
-  # ── Build & deploy shell (only when shell/shared packages change) ───────────
+  # Ã¢â€â‚¬Ã¢â€â‚¬ Build & deploy shell (only when shell/shared packages change) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   deploy-shell:
     runs-on: ubuntu-latest
     needs: [changes, acr-creds]
@@ -267,7 +271,11 @@ jobs:
               "RAZORPAY_WEBHOOK_SECRET=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
               "SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL=${{ secrets.SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL }}" \
               "SKILLZ_AGENT_CUSTOMER_BOOKING_URL=${{ secrets.SKILLZ_AGENT_CUSTOMER_BOOKING_URL }}" \
-              "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}"
+              "SKILLZ_AGENT_PAYMENT_URL=${{ secrets.SKILLZ_AGENT_PAYMENT_URL }}" \
+              "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" \
+              "GMAIL_REDIRECT_URI=${{ secrets.GMAIL_REDIRECT_URI }}"
 
       - name: Set agent URLs on App Service
         run: |

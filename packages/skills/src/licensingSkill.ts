@@ -12,7 +12,7 @@ import {
   getRevenueByCoach,
 } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
-import { Resend } from 'resend';
+import { sendEmail } from './mailer';
 
 export async function licenseModuleToCoach(
   licensorId: string,
@@ -60,16 +60,15 @@ export async function sendLicenseInvitation(
   const programTitle = (prog?.title as string) ?? 'a program';
 
   // Look up licensor name
-  const { data: licensor } = await supabase.from('user_profiles').select('name').eq('user_id', licensorId).single();
-  const licensorName = (licensor?.name as string) ?? 'A coach';
+  const { data: licensor } = await supabase.from('user_profiles').select('name, email').eq('user_id', licensorId).single();
+  const licensorName  = (licensor?.name  as string | undefined) ?? 'A coach';
+  const licensorEmail = (licensor?.email as string | undefined) ?? undefined;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? 'http://localhost:3000';
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? 'http://localhost:3000';
   const inviteUrl = `${appUrl}/license-invite/${inviteToken}`;
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'noreply@skillz.app',
-    to:   params.licenseeEmail,
+  await sendEmail({
+    to:      params.licenseeEmail,
     subject: `You've been invited to license "${programTitle}"`,
     html: `
       <p>Hi there,</p>
@@ -81,6 +80,7 @@ export async function sendLicenseInvitation(
       <p><a href="${inviteUrl}" style="background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:8px;">View &amp; Accept Invitation</a></p>
       <p style="color:#6b7280;font-size:12px;">If you don't have an account, you'll be guided to create one first.</p>
     `,
+    replyTo: licensorEmail,
   });
 
   return { inviteToken, licenseId };

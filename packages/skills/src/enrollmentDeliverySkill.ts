@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import { sendEmail } from './mailer';
 import { ClientProfile, ModuleSectionSpec, EnrollmentType } from '@coaching/sdk';
 import {
   upsertClientProfile,
@@ -12,12 +12,6 @@ import {
 } from '@coaching/tools';
 import { supabase } from '@coaching/sdk';
 import { computeAndWriteRevenue } from './licensingSkill';
-
-let _resend: Resend | null = null;
-function getResend(): Resend {
-  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY ?? 'placeholder');
-  return _resend;
-}
 
 export async function enrollClient(
   packageId: string,
@@ -82,20 +76,23 @@ export async function enrollClient(
   const protocol = domain.startsWith('localhost') ? 'http' : 'https';
   const portalUrl = `${protocol}://${domain}/portal/${client.inviteToken}`;
 
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const result = await getResend().emails.send({
-        from:    process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
-        to:      client.email,
-        subject: `You've been invited to ${pkgData?.title ?? 'a coaching program'}`,
-        html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
-      });
-      process.stdout.write(`[enrollClient] email result: ${JSON.stringify(result)}\n`);
-    } catch (emailErr) {
-      process.stdout.write(`[enrollClient] email failed: ${String(emailErr)}\n`);
-    }
-  } else {
-    process.stdout.write('[enrollClient] RESEND_API_KEY not set, skipping email\n');
+  // Look up coach email to use as Reply-To
+  const { data: coachRow } = await supabase
+    .from('user_profiles')
+    .select('email')
+    .eq('user_id', coachId)
+    .maybeSingle();
+  const coachEmail = (coachRow?.email as string | undefined) ?? undefined;
+
+  try {
+    await sendEmail({
+      to:      client.email,
+      subject: `You've been invited to ${pkgData?.title ?? 'a coaching program'}`,
+      html:    `<p>Hi ${client.name},</p><p>Click <a href="${portalUrl}">here</a> to access your program.</p>`,
+      replyTo: coachEmail,
+    });
+  } catch (emailErr) {
+    process.stdout.write(`[enrollClient] email failed: ${String(emailErr)}\n`);
   }
 
   return { client, portalUrl };

@@ -7,8 +7,10 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 const GMAIL_REDIRECT_URI   = process.env.GMAIL_REDIRECT_URI!;
 
 export async function GET(req: NextRequest) {
-  const { searchParams, origin } = new URL(req.url);
-  const APP_URL = origin;
+  const { searchParams } = new URL(req.url);
+  const host  = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? '';
+  const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim() ?? 'https';
+  const APP_URL = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
   const code  = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');

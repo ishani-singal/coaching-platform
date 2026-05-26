@@ -630,17 +630,14 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                     customPrice:    enrollForm.customPrice    ? parseFloat(enrollForm.customPrice)    : undefined,
                     discountAmount: enrollForm.discountAmount ? parseFloat(enrollForm.discountAmount) : undefined,
                   } }),
-                }).then(res => res.json()) as { success: boolean; message: string; data: { portalUrl: string } };
+                }).then(res => res.json()) as { success: boolean; message: string; data: { portalUrl: string; client?: { inviteToken?: string } } };
                 if (r.success) {
                   setEnrollStatus('✓ Enrolled successfully');
-                  if (r.data?.portalUrl) {
-                    try {
-                      const parsed = new URL(r.data.portalUrl);
-                      setEnrollPortalUrl(window.location.origin + parsed.pathname);
-                    } catch {
-                      setEnrollPortalUrl('');
-                    }
-                  }
+                  // Build URL from inviteToken directly so it always uses the current
+                  // origin, regardless of how PLATFORM_DOMAIN is set on the agent.
+                  const token = r.data?.client?.inviteToken
+                    ?? (r.data?.portalUrl ? r.data.portalUrl.split('/portal/')[1] : undefined);
+                  setEnrollPortalUrl(token ? window.location.origin + '/portal/' + token : '');
                   setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });
                 } else {
                   setEnrollStatus(`✗ ${r.message}`);

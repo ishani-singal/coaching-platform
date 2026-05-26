@@ -5,10 +5,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 const GMAIL_REDIRECT_URI   = process.env.GMAIL_REDIRECT_URI!;
-const APP_URL              = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+  const { searchParams, origin } = new URL(req.url);
+  const APP_URL = origin;
   const code  = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');

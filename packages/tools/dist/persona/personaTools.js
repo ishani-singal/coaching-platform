@@ -65,10 +65,17 @@ async function savePersonaSnapshot(coachId, tone, style, summary, raw) {
         .limit(1)
         .maybeSingle();
     const nextVersion = (latest?.version ?? 0) + 1;
+    const { error: insertError } = await sdk_1.supabase
+        .from('persona_snapshots')
+        .insert({ coach_id: coachId, version: nextVersion, tone, style, summary, raw_snapshot: raw });
+    if (insertError)
+        throw new Error(insertError.message);
+    // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
     const { data, error } = await sdk_1.supabase
         .from('persona_snapshots')
-        .insert({ coach_id: coachId, version: nextVersion, tone, style, summary, raw_snapshot: raw })
-        .select()
+        .select('*')
+        .eq('coach_id', coachId)
+        .eq('version', nextVersion)
         .single();
     if (error)
         throw new Error(error.message);

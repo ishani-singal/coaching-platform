@@ -61,26 +61,38 @@ export async function upgradeToCoach(
 export { checkSlugAvailable };
 
 async function forkProgramForNewCoach(originalProgramId: string, newCoachId: string): Promise<void> {
-  const orig = await getProgramWithPeriods(originalProgramId);
-  const newProg = await createProgram(newCoachId, orig.title, orig.description);
+  let forkStep = 'getProgramWithPeriods';
+  try {
+    const orig = await getProgramWithPeriods(originalProgramId);
 
-  if (orig.periods && orig.periods.length > 0) {
-    for (let pi = 0; pi < orig.periods.length; pi++) {
-      const period = orig.periods[pi];
-      await createProgramPeriod(newProg.programId, pi, period.label, period.periodType);
-      const mods = period.modules ?? [];
+    forkStep = 'createProgram';
+    const newProg = await createProgram(newCoachId, orig.title, orig.description);
+
+    if (orig.periods && orig.periods.length > 0) {
+      for (let pi = 0; pi < orig.periods.length; pi++) {
+        const period = orig.periods[pi];
+        forkStep = `createProgramPeriod[${pi}]`;
+        await createProgramPeriod(newProg.programId, pi, period.label, period.periodType);
+        const mods = period.modules ?? [];
+        for (let mi = 0; mi < mods.length; mi++) {
+          forkStep = `forkModule[${pi}][${mi}]:${mods[mi].moduleId}`;
+          const forked = await forkModuleTool(mods[mi].moduleId, newCoachId, { noSublicense: true });
+          forkStep = `addModuleToPeriod[${pi}][${mi}]`;
+          await addModuleToPeriodByOrder(newProg.programId, pi, forked.moduleId, mi);
+        }
+      }
+    } else {
+      forkStep = 'createProgramPeriod[implicit]';
+      await createProgramPeriod(newProg.programId, 0, '', 'custom');
+      const mods = orig.modules ?? [];
       for (let mi = 0; mi < mods.length; mi++) {
+        forkStep = `forkModule[implicit][${mi}]:${mods[mi].moduleId}`;
         const forked = await forkModuleTool(mods[mi].moduleId, newCoachId, { noSublicense: true });
-        await addModuleToPeriodByOrder(newProg.programId, pi, forked.moduleId, mi);
+        forkStep = `addModuleToPeriod[implicit][${mi}]`;
+        await addModuleToPeriodByOrder(newProg.programId, 0, forked.moduleId, mi);
       }
     }
-  } else {
-    // No periods — create implicit period and add forked modules
-    await createProgramPeriod(newProg.programId, 0, '', 'custom');
-    const mods = orig.modules ?? [];
-    for (let mi = 0; mi < mods.length; mi++) {
-      const forked = await forkModuleTool(mods[mi].moduleId, newCoachId, { noSublicense: true });
-      await addModuleToPeriodByOrder(newProg.programId, 0, forked.moduleId, mi);
-    }
+  } catch (e: unknown) {
+    throw new Error(`${forkStep}: ${(e as Error).message}`);
   }
 }

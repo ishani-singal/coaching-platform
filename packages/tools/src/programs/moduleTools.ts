@@ -7,23 +7,22 @@ export async function createModule(
   category: string,
   derivedFromId?: string
 ): Promise<ModuleRecord> {
+  const moduleId = crypto.randomUUID();
   const { error: insertError } = await supabase
     .from('modules')
     .insert({
+      module_id:              moduleId,
       creator_coach_id:       coachId,
       title,
       category,
       derived_from_module_id: derivedFromId ?? null,
     });
   if (insertError) throw new Error(insertError.message);
-  // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
+  // Select by explicit PK — avoids PGRST116 race from filter-based selects after insert.
   const { data, error } = await supabase
     .from('modules')
     .select('*')
-    .eq('creator_coach_id', coachId)
-    .eq('title', title)
-    .order('created_at', { ascending: false })
-    .limit(1)
+    .eq('module_id', moduleId)
     .single();
   if (error) throw new Error(error.message);
   return mapModule(data);
@@ -118,9 +117,11 @@ export async function forkModule(
     throw new Error('This module cannot be forked');
   }
 
+  const newModuleId = crypto.randomUUID();
   const { error: e2 } = await supabase
     .from('modules')
     .insert({
+      module_id:              newModuleId,
       creator_coach_id:       newCoachId,
       title:                  orig.title,
       category:               orig.category,
@@ -129,14 +130,11 @@ export async function forkModule(
       no_sublicense:          opts?.noSublicense ?? false,
     });
   if (e2) throw new Error(e2.message);
-  // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
+  // Select by explicit PK — avoids PGRST116 race from filter-based selects after insert.
   const { data: newMod, error: e2b } = await supabase
     .from('modules')
     .select('*')
-    .eq('creator_coach_id', newCoachId)
-    .eq('derived_from_module_id', originalModuleId)
-    .order('created_at', { ascending: false })
-    .limit(1)
+    .eq('module_id', newModuleId)
     .single();
   if (e2b) throw new Error(e2b.message);
 

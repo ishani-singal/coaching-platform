@@ -864,12 +864,22 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                     : 'bg-red-50 text-red-700 border border-red-100'
                 }`}>{licenseStatus}</p>
               )}
-              <button
-                type="submit"
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
-              >
-                Send Invitation
-              </button>
+              {licenseStatus.startsWith('✓') ? (
+                <button
+                  type="button"
+                  onClick={() => { setLicenseOpen(false); setLicenseStatus(''); }}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Done
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Send Invitation
+                </button>
+              )}
             </form>
           </div>
         </div>

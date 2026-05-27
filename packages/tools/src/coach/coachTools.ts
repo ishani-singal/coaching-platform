@@ -14,10 +14,17 @@ export async function ensureCoachProfile(userId: string): Promise<void> {
 }
 
 export async function upgradeToCoach(userId: string, slug: string, displayName: string): Promise<CoachProfile> {
+  // Separate upsert from select — PostgREST PGRST116 fires on the UPDATE
+  // conflict path when .upsert().select().single() are chained in one call.
+  const { error: upsertError } = await supabase
+    .from('user_profiles')
+    .upsert({ user_id: userId, role: 'coach', slug, display_name: displayName }, { onConflict: 'user_id' });
+  if (upsertError) throw new Error(upsertError.message);
+
   const { data, error } = await supabase
     .from('user_profiles')
-    .upsert({ user_id: userId, role: 'coach', slug, display_name: displayName }, { onConflict: 'user_id' })
-    .select()
+    .select('*')
+    .eq('user_id', userId)
     .single();
   if (error) throw new Error(error.message);
   return mapCoach(data);

@@ -12,12 +12,13 @@ export async function upgradeToCoach(
   const coachProfile = await upgradeCoachTool(userId, slug, displayName);
 
   // Seed an empty draft package
-  await supabase.from('packages').insert({
+  const { error: pkgError } = await supabase.from('packages').insert({
     coach_id:      userId,
     title:         'My First Package',
     pricing_model: 'free',
     is_published:  false,
   });
+  if (pkgError) throw new Error(`Package seed failed: ${pkgError.message}`);
 
   // Build initial persona snapshot from display name
   const introText = `I am ${displayName}, a coach passionate about helping people reach their goals.`;

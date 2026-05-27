@@ -74,7 +74,7 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
   const [newModuleTrigger, setNewModuleTrigger] = useState(0);
   const [pkgSubTab, setPkgSubTab] = useState<'published' | 'unpublished'>('published');
   const [enrollOpen,   setEnrollOpen]   = useState(false);
-  const [enrollForm,   setEnrollForm]   = useState({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });
+  const [enrollForm,   setEnrollForm]   = useState({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '', paymentModel: 'one-time', currency: 'USD' });
   const [enrollStatus, setEnrollStatus] = useState('');
   const [enrollPortalUrl, setEnrollPortalUrl] = useState('');
   const [licenseOpen,      setLicenseOpen]      = useState(false);
@@ -520,16 +520,6 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                 </svg>
                 Enroll
               </button>
-              <button
-                type="button"
-                onClick={() => { setLicenseStatus(''); setLicenseOpen(true); }}
-                className="border border-purple-600 text-purple-600 hover:bg-purple-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-                License
-              </button>
             </div>
           )}
 
@@ -613,7 +603,7 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Enroll Client / Trainee</h2>
+              <h2 className="text-xl font-bold text-gray-900">Enroll Client / Trainee / Licence</h2>
               <button type="button" onClick={() => setEnrollOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <form
@@ -622,66 +612,54 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                 e.preventDefault();
                 setEnrollStatus('');
                 setEnrollPortalUrl('');
-                const r = await fetch('/api/agents/coaching-program-runner/action', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ userId, config: {}, action: 'enroll_client', params: {
-                    ...enrollForm,
-                    customPrice:    enrollForm.customPrice    ? parseFloat(enrollForm.customPrice)    : undefined,
-                    discountAmount: enrollForm.discountAmount ? parseFloat(enrollForm.discountAmount) : undefined,
-                  } }),
-                }).then(res => res.json()) as { success: boolean; message: string; data: { portalUrl: string; client?: { inviteToken?: string } } };
-                if (r.success) {
-                  setEnrollStatus('✓ Enrolled successfully');
-                  // Build URL from inviteToken directly so it always uses the current
-                  // origin, regardless of how PLATFORM_DOMAIN is set on the agent.
-                  const token = r.data?.client?.inviteToken
-                    ?? (r.data?.portalUrl ? r.data.portalUrl.split('/portal/')[1] : undefined);
-                  setEnrollPortalUrl(token ? window.location.origin + '/portal/' + token : '');
-                  setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '' });
+                
+                if (enrollForm.enrollmentType === 'licence') {
+                  // Handle license submission
+                  const r = await fetch('/api/agents/coaching-licensing/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      userId, 
+                      config: {}, 
+                      action: 'send_license_invitation', 
+                      params: { 
+                        programId: enrollForm.packageId,
+                        licenseeEmail: enrollForm.clientEmail,
+                        licenseFeeAmount: enrollForm.customPrice ? parseFloat(enrollForm.customPrice) : 0,
+                        licenseFeeCurrency: enrollForm.currency,
+                        paymentModel: enrollForm.paymentModel,
+                      } 
+                    }),
+                  }).then(res => res.json()) as { success: boolean; message: string };
+                  if (r.success) {
+                    setEnrollStatus('✓ License invitation sent successfully');
+                    setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '', paymentModel: 'one-time', currency: 'USD' });
+                  } else {
+                    setEnrollStatus(`✗ ${r.message}`);
+                  }
                 } else {
-                  setEnrollStatus(`✗ ${r.message}`);
+                  // Handle client/trainee enrollment
+                  const r = await fetch('/api/agents/coaching-program-runner/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, config: {}, action: 'enroll_client', params: {
+                      ...enrollForm,
+                      customPrice:    enrollForm.customPrice    ? parseFloat(enrollForm.customPrice)    : undefined,
+                      discountAmount: enrollForm.discountAmount ? parseFloat(enrollForm.discountAmount) : undefined,
+                    } }),
+                  }).then(res => res.json()) as { success: boolean; message: string; data: { portalUrl: string; client?: { inviteToken?: string } } };
+                  if (r.success) {
+                    setEnrollStatus('✓ Enrolled successfully');
+                    const token = r.data?.client?.inviteToken
+                      ?? (r.data?.portalUrl ? r.data.portalUrl.split('/portal/')[1] : undefined);
+                    setEnrollPortalUrl(token ? window.location.origin + '/portal/' + token : '');
+                    setEnrollForm({ packageId: '', clientName: '', clientEmail: '', enrollmentType: 'client', customPrice: '', discountAmount: '', paymentModel: 'one-time', currency: 'USD' });
+                  } else {
+                    setEnrollStatus(`✗ ${r.message}`);
+                  }
                 }
               }}
             >
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Package</label>
-                <select
-                  aria-label="Package"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  value={enrollForm.packageId}
-                  onChange={e => setEnrollForm(f => ({ ...f, packageId: e.target.value }))}
-                  required
-                >
-                  <option value="">Select a package…</option>
-                  {packages.map(p => (
-                    <option key={p.packageId} value={p.packageId}>
-                      {p.title}{!p.isPublished ? ' (draft)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Client Name</label>
-                <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder="Full name"
-                  value={enrollForm.clientName}
-                  onChange={e => setEnrollForm(f => ({ ...f, clientName: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Email Address</label>
-                <input
-                  type="email"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder="client@example.com"
-                  value={enrollForm.clientEmail}
-                  onChange={e => setEnrollForm(f => ({ ...f, clientEmail: e.target.value }))}
-                  required
-                />
-              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Enrollment Type</label>
                 <select
@@ -692,9 +670,113 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
                 >
                   <option value="client">Client</option>
                   <option value="trainee">Trainee</option>
+                  <option value="licence">Licence</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                  {enrollForm.enrollmentType === 'licence' ? 'Program' : 'Package'}
+                </label>
+                <select
+                  aria-label={enrollForm.enrollmentType === 'licence' ? 'Program' : 'Package'}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={enrollForm.packageId}
+                  onChange={e => setEnrollForm(f => ({ ...f, packageId: e.target.value }))}
+                  required
+                >
+                  <option value="">Select a {enrollForm.enrollmentType === 'licence' ? 'program' : 'package'}…</option>
+                  {enrollForm.enrollmentType === 'licence'
+                    ? programs.map(p => (
+                        <option key={p.programId} value={p.programId}>
+                          {p.title}
+                        </option>
+                      ))
+                    : packages.map(p => (
+                        <option key={p.packageId} value={p.packageId}>
+                          {p.title}{!p.isPublished ? ' (draft)' : ''}
+                        </option>
+                      ))
+                  }
+                </select>
+              </div>
+              {enrollForm.enrollmentType !== 'licence' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Client Name</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    placeholder="Full name"
+                    value={enrollForm.clientName}
+                    onChange={e => setEnrollForm(f => ({ ...f, clientName: e.target.value }))}
+                    required
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                  {enrollForm.enrollmentType === 'licence' ? 'Licensee Email' : 'Email Address'}
+                </label>
+                <input
+                  type="email"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder={enrollForm.enrollmentType === 'licence' ? 'coach@example.com' : 'client@example.com'}
+                  value={enrollForm.clientEmail}
+                  onChange={e => setEnrollForm(f => ({ ...f, clientEmail: e.target.value }))}
+                  required
+                />
+              </div>
+              {enrollForm.enrollmentType === 'licence' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Payment Model</label>
+                    <select
+                      aria-label="Payment Model"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      value={enrollForm.paymentModel}
+                      onChange={e => setEnrollForm(f => ({ ...f, paymentModel: e.target.value }))}
+                    >
+                      <option value="one-time">One-Time</option>
+                      <option value="subscription-monthly">Subscription (Monthly)</option>
+                      <option value="subscription-annual">Subscription (Annual)</option>
+                      <option value="per-customer">Per Customer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Currency</label>
+                    <select
+                      aria-label="Currency"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      value={enrollForm.currency}
+                      onChange={e => setEnrollForm(f => ({ ...f, currency: e.target.value }))}
+                    >
+                      {['USD','EUR','GBP','INR','AUD','CAD','JPY','SGD'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
               {enrollForm.packageId && (() => {
+                if (enrollForm.enrollmentType === 'licence') {
+                  return (
+                    <div className="space-y-4 border border-purple-100 rounded-xl p-4 bg-purple-50">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">License Fee</p>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                          Fee Amount ({enrollForm.currency})
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+                          placeholder="0.00"
+                          value={enrollForm.customPrice}
+                          onChange={e => setEnrollForm(f => ({ ...f, customPrice: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
                 const pkg = packages.find(p => p.packageId === enrollForm.packageId);
                 const defaultLabel = pkg?.pricingModel === 'free' ? 'Free' : pkg?.priceUsd != null ? `Default: $${pkg.priceUsd}` : 'No default price';
                 return (
@@ -761,9 +843,13 @@ function ProgramBuilderInner({ userId }: { userId: string }) {
               )}
               <button
                 type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                  enrollForm.enrollmentType === 'licence'
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
               >
-                Enroll
+                {enrollForm.enrollmentType === 'licence' ? 'Send License Invitation' : 'Enroll'}
               </button>
             </form>
           </div>

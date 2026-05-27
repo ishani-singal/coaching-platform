@@ -25,18 +25,17 @@ export async function upgradeToCoach(
 
     // Build initial persona snapshot from display name
     step = 'generatePersona';
-    const introText = `I am ${displayName}, a coach passionate about helping people reach their goals.`;
-    const llm = getLLMClient();
-    const systemInstruction = 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }';
-    const rawText = (await llm.generateText(systemInstruction, introText)).trim().replace(/^```json\s*|```$/g, '');
-
     let tone = 'encouraging', style = 'conversational', summary = `I am ${displayName}.`;
     try {
+      const introText = `I am ${displayName}, a coach passionate about helping people reach their goals.`;
+      const llm = getLLMClient();
+      const systemInstruction = 'Extract tone, style, and a one-sentence summary from this coach intro. Reply as JSON only, no markdown: { "tone": "...", "style": "...", "summary": "..." }';
+      const rawText = (await llm.generateText(systemInstruction, introText)).trim().replace(/^```json\s*|```$/g, '');
       const parsed = JSON.parse(rawText);
       tone    = parsed.tone    ?? tone;
       style   = parsed.style   ?? style;
       summary = parsed.summary ?? summary;
-    } catch { /* use defaults */ }
+    } catch { /* transient LLM error or bad JSON — use defaults */ }
 
     step = 'savePersonaSnapshot';
     const snapshot = await savePersonaSnapshot(userId, tone, style, summary, {});

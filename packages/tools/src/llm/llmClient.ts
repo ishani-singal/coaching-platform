@@ -327,6 +327,6 @@ function createAzureOpenAIClient(): LLMClient {
 // ── Factory ──────────────────────────────────────────────────────────────────
 
 export function getLLMClient(provider?: LLMProvider): LLMClient {
-  const p = provider ?? (process.env.LLM_PROVIDER as LLMProvider | undefined) ?? 'gemini';
+  const p = provider ?? (process.env.LLM_PROVIDER as LLMProvider | undefined) ?? 'azure-openai';
   return p === 'azure-openai' ? createAzureOpenAIClient() : createGeminiClient();
 }

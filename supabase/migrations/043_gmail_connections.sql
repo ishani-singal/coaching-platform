@@ -10,10 +10,12 @@ create table if not exists coach_gmail_connections (
 
 alter table coach_gmail_connections enable row level security;
 
+drop policy if exists "coach can view own gmail connection" on coach_gmail_connections;
 create policy "coach can view own gmail connection"
   on coach_gmail_connections for select
   using (auth.uid() = coach_id);
 
+drop policy if exists "coach can delete own gmail connection" on coach_gmail_connections;
 create policy "coach can delete own gmail connection"
   on coach_gmail_connections for delete
   using (auth.uid() = coach_id);

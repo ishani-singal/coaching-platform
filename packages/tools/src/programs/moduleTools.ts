@@ -7,15 +7,23 @@ export async function createModule(
   category: string,
   derivedFromId?: string
 ): Promise<ModuleRecord> {
-  const { data, error } = await supabase
+  const { error: insertError } = await supabase
     .from('modules')
     .insert({
       creator_coach_id:       coachId,
       title,
       category,
       derived_from_module_id: derivedFromId ?? null,
-    })
-    .select()
+    });
+  if (insertError) throw new Error(insertError.message);
+  // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
+  const { data, error } = await supabase
+    .from('modules')
+    .select('*')
+    .eq('creator_coach_id', coachId)
+    .eq('title', title)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
   if (error) throw new Error(error.message);
   return mapModule(data);
@@ -110,7 +118,7 @@ export async function forkModule(
     throw new Error('This module cannot be forked');
   }
 
-  const { data: newMod, error: e2 } = await supabase
+  const { error: e2 } = await supabase
     .from('modules')
     .insert({
       creator_coach_id:       newCoachId,
@@ -119,10 +127,18 @@ export async function forkModule(
       derived_from_module_id: originalModuleId,
       sections:               orig.sections,
       no_sublicense:          opts?.noSublicense ?? false,
-    })
-    .select()
-    .single();
+    });
   if (e2) throw new Error(e2.message);
+  // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
+  const { data: newMod, error: e2b } = await supabase
+    .from('modules')
+    .select('*')
+    .eq('creator_coach_id', newCoachId)
+    .eq('derived_from_module_id', originalModuleId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (e2b) throw new Error(e2b.message);
 
   // Load existing ancestry for the original module
   const { data: ancestry } = await supabase

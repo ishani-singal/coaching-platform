@@ -2,10 +2,18 @@ import { supabase } from '@coaching/sdk';
 import { ProgramRecord, ProgramPeriod, PeriodType, ModuleRecord } from '@coaching/sdk';
 
 export async function createProgram(coachId: string, title: string, description?: string): Promise<ProgramRecord> {
+  const { error: insertError } = await supabase
+    .from('programs')
+    .insert({ creator_coach_id: coachId, title, description });
+  if (insertError) throw new Error(insertError.message);
+  // Separate select — chaining .insert().select().single() triggers PGRST116 on some PostgREST versions.
   const { data, error } = await supabase
     .from('programs')
-    .insert({ creator_coach_id: coachId, title, description })
-    .select()
+    .select('*')
+    .eq('creator_coach_id', coachId)
+    .eq('title', title)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
   if (error) throw new Error(error.message);
   return mapProgram(data);

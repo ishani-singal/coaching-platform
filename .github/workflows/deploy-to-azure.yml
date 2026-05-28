@@ -218,6 +218,7 @@ jobs:
             -f shell/Dockerfile \
             --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
+            --build-arg PLATFORM_DOMAIN=${{ secrets.PLATFORM_DOMAIN }} \
             .
           docker push ${{ env.REGISTRY }}/shell:latest
           docker push ${{ env.REGISTRY }}/shell:$SHA

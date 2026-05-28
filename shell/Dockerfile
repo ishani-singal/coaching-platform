@@ -17,8 +17,10 @@ RUN pnpm install --frozen-lockfile
 # Inject public env vars at build time so Next.js can bake them into the client bundle
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG PLATFORM_DOMAIN
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-https://bthacagrowxgbuhlbcng.supabase.co}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-REDACTED_SUPABASE_ANON_KEY}
+ENV PLATFORM_DOMAIN=${PLATFORM_DOMAIN:-coaching-platform-prod-shell.azurewebsites.net}
 
 # Inject server-side Supabase vars at build time so next.config.ts env block bakes real values
 # into the Edge Runtime middleware bundle (process.env is read at compile time, not runtime).

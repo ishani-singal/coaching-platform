@@ -254,6 +254,24 @@ async function onAction(req: ActionRequest) {
 
       const provider = resolveProvider(currency);
 
+      // ── Bypass payment if credentials not configured ──────────────────────
+      const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
+      const razorpayConfigured = !!process.env.RAZORPAY_KEY_ID && !!process.env.RAZORPAY_KEY_SECRET;
+
+      if ((provider === 'stripe' && !stripeConfigured) || (provider === 'razorpay' && !razorpayConfigured)) {
+        console.warn(`[${AGENT_ID}] Payment provider ${provider} not configured. Bypassing payment.`);
+        return {
+          success: true,
+          message: `Payment bypassed (${provider} credentials not configured)`,
+          data: {
+            bypassed: true,
+            provider,
+            paymentLinkUrl: redirectUrl,
+            paymentLinkId: 'bypassed',
+          },
+        };
+      }
+
       // ── Stripe (USD and other non-INR currencies) ─────────────────────────
       if (provider === 'stripe') {
         const stripe = getStripe();

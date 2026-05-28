@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 interface PayApiResponse {
   alreadyFree?:  boolean;
   alreadyPaid?:  boolean;
+  bypassed?:     boolean;
   provider?:     string;
   checkoutUrl?:  string;
   success?:      boolean;
@@ -24,7 +25,7 @@ export default async function PayGatePage({ params }: { params: Promise<{ token:
 
   const data = await res.json() as PayApiResponse;
 
-  if (data.alreadyFree || data.alreadyPaid) {
+  if (data.alreadyFree || data.alreadyPaid || data.bypassed) {
     redirect(portalUrl);
   }
 

@@ -82,6 +82,7 @@ export async function POST(
       success: boolean;
       message: string;
       data?: {
+        bypassed?:       boolean;
         provider:       string;
         paymentLinkUrl?: string;
         paymentLinkId:  string;
@@ -93,6 +94,16 @@ export async function POST(
 
     if (!agentData.success || !agentData.data) {
       return NextResponse.json({ success: false, message: agentData.message }, { status: 502 });
+    }
+
+    // Handle bypassed payment (credentials not configured)
+    if (agentData.data.bypassed) {
+      return NextResponse.json({
+        success: true,
+        bypassed: true,
+        provider: agentData.data.provider,
+        checkoutUrl: agentData.data.paymentLinkUrl,
+      });
     }
 
     const { provider, paymentLinkUrl, paymentIntentId, paymentLinkId, orderId, razorpayKeyId } = agentData.data;

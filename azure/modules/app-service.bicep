@@ -2,6 +2,8 @@ param location string
 param projectName string
 param environment string
 param keyVaultName string
+param acrLoginServer string
+param acrName string
 
 var appServicePlanName = '${projectName}-${environment}-plan'
 var appServiceName = '${projectName}-${environment}-shell'
@@ -23,11 +25,14 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
 resource appService 'Microsoft.Web/sites@2023-01-01' = {
   name: appServiceName
   location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'NODE|20-lts'
-      nodeVersion: '20-lts'
+      linuxFxVersion: 'DOCKER|${acrLoginServer}/shell:latest'
+      acrUseManagedIdentityCreds: true
       appSettings: [
         {
           name: 'WEBSITES_PORT'
@@ -43,6 +48,14 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+          value: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/supabase-anon-key/)'
+        }
+        {
+          name: 'SUPABASE_URL'
+          value: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/supabase-url/)'
+        }
+        {
+          name: 'SUPABASE_ANON_KEY'
           value: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/supabase-anon-key/)'
         }
         {
@@ -71,6 +84,21 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
         }
       ]
     }
+  }
+}
+
+// Grant the App Service managed identity AcrPull role on the container registry
+resource acrResource 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' existing = {
+  name: acrName
+}
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(appService.id, acrResource.id, 'AcrPull')
+  scope: acrResource
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: appService.identity.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 

@@ -50,6 +50,8 @@ module appService 'modules/app-service.bicep' = {
     projectName: projectName
     environment: environment
     keyVaultName: keyVault.outputs.keyVaultName
+    acrLoginServer: acr.outputs.loginServer
+    acrName: acr.outputs.name
   }
 }
 

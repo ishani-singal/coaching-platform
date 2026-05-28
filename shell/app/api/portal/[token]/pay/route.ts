@@ -19,7 +19,7 @@ export async function POST(
       return NextResponse.json({ alreadyFree: true });
     }
 
-    const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+    const domain   = process.env.PLATFORM_DOMAIN?.trim() || 'localhost:3000';
     const protocol = domain.startsWith('localhost') ? 'http' : 'https';
     const portalUrl = `${protocol}://${domain}/portal/${token}`;
 

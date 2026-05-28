@@ -12,7 +12,7 @@ interface PayApiResponse {
 export default async function PayGatePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
-  const domain   = process.env.PLATFORM_DOMAIN ?? 'localhost:3000';
+  const domain   = process.env.PLATFORM_DOMAIN?.trim() || 'localhost:3000';
   const protocol = domain.startsWith('localhost') ? 'http' : 'https';
   const portalUrl = `/portal/${token}`;
 

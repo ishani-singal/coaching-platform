@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const DOMAIN = process.env.PLATFORM_DOMAIN!;
+const DOMAIN = process.env.PLATFORM_DOMAIN?.trim() || 'coaching-platform-prod-shell.azurewebsites.net';
 
 // ── In-memory rate limiter (per-IP, no Redis required) ────────────────────
 // Limits POST /api/coaches/*/chat to 60 requests per minute per IP.

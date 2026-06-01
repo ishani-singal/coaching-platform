@@ -320,7 +320,16 @@ async function runDailyMaintenance(): Promise<void> {
 }
 
 const app = createAgentServer(manifest, { context: onContext, action: onAction });
-app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
+
+// Multi-agent mode: export app for mounting by parent server
+if (process.env.MULTI_AGENT_MODE === 'true') {
+  export { app as coachLibraryApp };
+  console.log(`[${AGENT_ID}] Exported for multi-agent mode`);
+} else {
+  // Standalone mode: start server and cron job
+  app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
+  // Note: Cron job runs in both modes
+}
 
 cron.schedule('0 2 * * *', () => {
   runDailyMaintenance().catch((err: Error) => console.error(`[${AGENT_ID}] Unhandled maintenance error: ${err.message}`));

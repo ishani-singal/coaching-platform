@@ -606,4 +606,12 @@ app.post('/webhooks/razorpay', async (req: Request & { rawBody?: Buffer }, res: 
   res.json({ received: true });
 });
 
-app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
+// Multi-agent mode: export app and webhook handlers for mounting by parent server
+if (process.env.MULTI_AGENT_MODE === 'true') {
+  // Export app for mounting under /payment prefix
+  export { app as paymentApp };
+  console.log(`[${AGENT_ID}] Exported for multi-agent mode`);
+} else {
+  // Standalone mode: start server
+  app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
+}

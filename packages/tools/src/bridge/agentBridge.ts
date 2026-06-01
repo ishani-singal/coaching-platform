@@ -62,8 +62,44 @@ export async function callAgentContext(agentId: string, userId: string): Promise
 }
 
 function resolveAgentUrl(agentId: string): string {
+  // Multi-agent mode: all agents behind a single base URL with route prefixes
+  if (process.env.MULTI_AGENT_MODE === 'true') {
+    const baseUrl = process.env.MULTI_AGENT_BASE_URL || process.env.SKILLZ_MULTI_AGENT_URL;
+    if (!baseUrl) {
+      throw new Error(
+        'MULTI_AGENT_MODE is enabled but no base URL configured. ' +
+        'Set MULTI_AGENT_BASE_URL or SKILLZ_MULTI_AGENT_URL in .env'
+      );
+    }
+    // Map agent IDs to their route prefixes
+    const routePrefix = getAgentRoutePrefix(agentId);
+    return `${baseUrl.replace(/\/$/, '')}/${routePrefix}`;
+  }
+
+  // Single-agent mode: each agent has its own URL
   const envKey = `SKILLZ_AGENT_${agentId.toUpperCase().replace(/-/g, '_')}_URL`;
   const url = process.env[envKey];
   if (url) return url;
   throw new Error(`No URL configured for agent '${agentId}'. Set ${envKey} in .env`);
+}
+
+function getAgentRoutePrefix(agentId: string): string {
+  // Map agent IDs to their route prefixes (matches multi-agent-server.ts mounting)
+  const prefixMap: Record<string, string> = {
+    'program-builder': 'program-builder',
+    'program-runner': 'program-runner',
+    'coach-library': 'coach-library',
+    'persona-chat': 'persona-chat',
+    'crm': 'crm',
+    'licensing': 'licensing',
+    'payment': 'payment',
+  };
+
+  const prefix = prefixMap[agentId];
+  if (!prefix) {
+    throw new Error(
+      `Unknown agent ID '${agentId}'. Valid IDs: ${Object.keys(prefixMap).join(', ')}`
+    );
+  }
+  return prefix;
 }

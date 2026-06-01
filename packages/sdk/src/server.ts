@@ -16,7 +16,8 @@ export function createAgentServer(
   handlers: {
     context: (req: ContextRequest) => Promise<unknown>;
     action:  (req: ActionRequest)  => Promise<unknown>;
-  }
+  },
+  options?: { basePath?: string }
 ): Express {
   const app = express();
   app.use(cors());
@@ -26,15 +27,18 @@ export function createAgentServer(
     },
   }));
 
-  app.get('/health',   (_req, res) => res.json({ status: 'ok', agentId: manifest.agentId }));
-  app.get('/manifest', (_req, res) => res.json(manifest));
+  const basePath = options?.basePath || '';
+  const normalizePath = (p: string) => basePath + p;
 
-  app.post('/context', requireShellToken, async (req, res) => {
+  app.get(normalizePath('/health'),   (_req, res) => res.json({ status: 'ok', agentId: manifest.agentId }));
+  app.get(normalizePath('/manifest'), (_req, res) => res.json(manifest));
+
+  app.post(normalizePath('/context'), requireShellToken, async (req, res) => {
     try   { res.json(await handlers.context(req.body)); }
     catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
   });
 
-  app.post('/action', requireShellToken, async (req, res) => {
+  app.post(normalizePath('/action'), requireShellToken, async (req, res) => {
     try   { res.json(await handlers.action(req.body)); }
     catch (e: unknown) {
       const msg = (e as Error).message ?? JSON.stringify(e);

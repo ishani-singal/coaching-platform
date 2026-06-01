@@ -1,5 +1,19 @@
 version: '3.8'
 services:
+  # Multi-agent mode: all 7 agents in a single container (70% cost reduction)
+  multi-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+      args:
+        AGENT_MODE: multi
+    ports: ['3000:3000']
+    env_file: .env
+    environment:
+      - MULTI_AGENT_MODE=true
+      - MULTI_AGENT_PORT=3000
+
+  # Individual agent services (legacy - keep for backward compatibility)
   program-builder:
     build: ./packages/agents/01-program-builder
     ports: ['3001:3000']

@@ -282,6 +282,15 @@ jobs:
           docker push ${{ env.REGISTRY }}/coaching-multi-agent:latest
           docker push ${{ env.REGISTRY }}/coaching-multi-agent:$SHA
 
+      - name: Configure GHCR credentials on multi-agent Container App
+        run: |
+          az containerapp registry set \
+            --name coachprod-multi \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server ghcr.io \
+            --username ${{ github.repository_owner }} \
+            --password-secret-name ghcr-password
+
       - name: Update multi-agent Container App
         run: |
           az containerapp update \
@@ -339,6 +348,15 @@ jobs:
             .
           docker push ${{ env.REGISTRY }}/shell:latest
           docker push ${{ env.REGISTRY }}/shell:$SHA
+
+      - name: Configure GHCR credentials on shell Container App
+        run: |
+          az containerapp registry set \
+            --name coachprod-shell \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server ghcr.io \
+            --username ${{ github.repository_owner }} \
+            --password-secret-name ghcr-password
 
       - name: Get multi-agent FQDN
         id: multi-agent

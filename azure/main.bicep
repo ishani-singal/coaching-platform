@@ -3,7 +3,6 @@ targetScope = 'subscription'
 param location string = 'centralus'
 param environment string = 'prod'
 param projectName string = 'coaching-platform'
-param ghcrOwner string
 
 var resourceGroupName = '${projectName}-v2-rg'
 
@@ -19,7 +18,6 @@ module containerApps 'modules/container-apps.bicep' = {
     location: location
     projectName: projectName
     environment: environment
-    ghcrOwner: ghcrOwner
   }
 }
 

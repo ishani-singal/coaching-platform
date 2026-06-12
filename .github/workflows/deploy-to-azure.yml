@@ -77,8 +77,7 @@ jobs:
             --parameters \
               environment=prod \
               location=${{ env.LOCATION }} \
-              projectName=coaching-platform \
-              ghcrOwner=${{ github.repository_owner }}
+              projectName=coaching-platform
 
   # ---- Seed secrets into both Container Apps ----
   seed-secrets:

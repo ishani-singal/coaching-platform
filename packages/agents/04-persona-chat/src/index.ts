@@ -814,11 +814,8 @@ app.post('/chat/generate-questions', requireShellToken, async (req: Request, res
   }
 });
 
-// Multi-agent mode: export app for mounting by parent server
-if (process.env.MULTI_AGENT_MODE === 'true') {
-  export { app as personaChatApp };
-  console.log(`[${AGENT_ID}] Exported for multi-agent mode`);
-} else {
-  // Standalone mode: start server
+export { app as personaChatApp };
+
+if (process.env.MULTI_AGENT_MODE !== 'true') {
   app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
 }

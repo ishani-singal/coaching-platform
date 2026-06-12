@@ -168,11 +168,8 @@ async function onAction(req: ActionRequest) {
 
 const app = createAgentServer(manifest, { context: onContext, action: onAction });
 
-// Multi-agent mode: export app for mounting by parent server
-if (process.env.MULTI_AGENT_MODE === 'true') {
-  export { app as programRunnerApp };
-  console.log(`[${AGENT_ID}] Exported for multi-agent mode`);
-} else {
-  // Standalone mode: start server
+export { app as programRunnerApp };
+
+if (process.env.MULTI_AGENT_MODE !== 'true') {
   app.listen(PORT, () => console.log(`[${AGENT_ID}] Running on port ${PORT}`));
 }

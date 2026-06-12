@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "typeRoots": [
+      "./01-program-builder/node_modules/@types",
+      "../../node_modules/@types"
+    ]
+  },
+  "include": ["multi-agent-server.ts"]
+}

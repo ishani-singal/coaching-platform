@@ -33,14 +33,15 @@ RUN pnpm --filter @coaching/sdk build \
 
 # Build specific agent or all agents depending on mode
 RUN if [ "$AGENT_MODE" = "multi" ]; then \
-      pnpm --filter "./packages/agents/*" build; \
+      pnpm --filter "./packages/agents/*" build && \
+      npx tsc -p packages/agents/tsconfig.json; \
     else \
       pnpm --filter "./packages/agents/${AGENT_NAME}" build; \
     fi
 
 # Bundle into a single self-contained file (resolves all workspace deps)
 RUN if [ "$AGENT_MODE" = "multi" ]; then \
-      npx --yes @vercel/ncc build packages/agents/multi-agent-server.ts \
+      npx --yes @vercel/ncc build packages/agents/dist/multi-agent-server.js \
         -o /bundle \
         --minify \
         --no-cache; \

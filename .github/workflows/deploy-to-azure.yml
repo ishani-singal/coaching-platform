@@ -289,7 +289,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --server ghcr.io \
             --username ${{ github.repository_owner }} \
-            --password-secret-name ghcr-password
+            --password ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update multi-agent Container App
         run: |
@@ -356,7 +356,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --server ghcr.io \
             --username ${{ github.repository_owner }} \
-            --password-secret-name ghcr-password
+            --password ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get multi-agent FQDN
         id: multi-agent

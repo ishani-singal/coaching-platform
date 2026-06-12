@@ -1,35 +1,49 @@
-﻿param location string
+param location string
 param projectName string
 param environment string
+param ghcrOwner string
 
 var containerAppsEnvName = '${projectName}-${environment}-env'
-var logAnalyticsName = '${projectName}-${environment}-logs'
-
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: logAnalyticsName
-  location: location
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-  }
-}
 
 resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-04-01-preview' = {
   name: containerAppsEnvName
   location: location
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalytics.properties.customerId
-        sharedKey: logAnalytics.listKeys().primarySharedKey
-      }
-    }
-  }
+  properties: {}
 }
 
-// Multi-Agent Container App (All 7 agents in a single container - ~70% cost savings)
+// Shared secrets for both container apps
+var sharedSecrets = [
+  { name: 'supabase-url', value: '' }
+  { name: 'supabase-anon-key', value: '' }
+  { name: 'supabase-service-role-key', value: '' }
+  { name: 'shell-internal-token', value: '' }
+  { name: 'llm-provider', value: '' }
+  { name: 'azure-openai-endpoint', value: '' }
+  { name: 'azure-openai-api-key', value: '' }
+  { name: 'azure-openai-deployment', value: '' }
+  { name: 'azure-openai-embedding-deployment', value: '' }
+  { name: 'gemini-api-key', value: '' }
+  { name: 'youtube-api-key', value: '' }
+  { name: 'pinecone-api-key', value: '' }
+  { name: 'pinecone-index', value: '' }
+  { name: 'resend-api-key', value: '' }
+  { name: 'from-email', value: '' }
+  { name: 'platform-domain', value: '' }
+  { name: 'platform-cut-pct', value: '' }
+  { name: 'stripe-secret-key', value: '' }
+  { name: 'stripe-publishable-key', value: '' }
+  { name: 'stripe-webhook-secret', value: '' }
+  { name: 'razorpay-key-id', value: '' }
+  { name: 'razorpay-key-secret', value: '' }
+  { name: 'razorpay-webhook-secret', value: '' }
+  { name: 'google-client-id', value: '' }
+  { name: 'google-client-secret', value: '' }
+  { name: 'google-redirect-uri', value: '' }
+  { name: 'gmail-redirect-uri', value: '' }
+  { name: 'ghcr-password', value: '' }
+]
+
+// Multi-Agent Container App (all 7 agents in a single container)
 resource multiAgentApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
   name: 'coachprod-multi'
   location: location
@@ -40,65 +54,68 @@ resource multiAgentApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
         external: true
         targetPort: 3000
       }
+      registries: [
+        {
+          server: 'ghcr.io'
+          username: ghcrOwner
+          passwordSecretRef: 'ghcr-password'
+        }
+      ]
+      secrets: sharedSecrets
     }
     template: {
       containers: [
         {
           name: 'multi-agent'
-          image: 'coachingplatformprod.azurecr.io/coaching-multi-agent:latest'
+          image: 'ghcr.io/${ghcrOwner}/coaching-multi-agent:latest'
           resources: {
-            cpu: json('2.0')    // 2 vCPU (vs 3.5 vCPU for 7 separate apps)
-            memory: '4Gi'       // 4 GiB (vs 7 GiB for 7 separate apps)
+            cpu: json('2.0')
+            memory: '4Gi'
           }
           env: [
             { name: 'MULTI_AGENT_MODE', value: 'true' }
             { name: 'MULTI_AGENT_PORT', value: '3000' }
-            { name: 'SUPABASE_URL', value: 'https://bthacagrowxgbuhlbcng.supabase.co' }
-            { name: 'SUPABASE_ANON_KEY', value: 'REDACTED_SUPABASE_ANON_KEY' }
-            { name: 'SUPABASE_SERVICE_ROLE_KEY', value: 'REDACTED_SUPABASE_SERVICE_ROLE_KEY' }
-            { name: 'SHELL_INTERNAL_TOKEN', value: '40587f5b3f3b4a9118a0723fd90b810a1d7104fa9e76b8e140e368797ec2a1ca' }
-            { name: 'LLM_PROVIDER', value: '' }
-            { name: 'AZURE_OPENAI_ENDPOINT', value: 'https://foundry-models-rg.services.ai.azure.com/openai/v1/' }
-            { name: 'AZURE_OPENAI_API_KEY', value: 'Cpb6Br9rD38HxPkItL4ajZmJJB1irYwPH136YNobfGqSiFj7BN7mJQQJ99CDACYeBjFXJ3w3AAAAACOGqQuO' }
-            { name: 'AZURE_OPENAI_DEPLOYMENT', value: 'Phi-4-mini-reasoning-1' }
-            { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', value: '' }
-            { name: 'GEMINI_API_KEY', value: 'REDACTED_GEMINI_API_KEY' }
-            { name: 'YOUTUBE_API_KEY', value: 'REDACTED_GEMINI_API_KEY' }
-            { name: 'PINECONE_API_KEY', value: 'pcsk_2MJ3WK_Kk8Us4fTsjZsYsk1Pi76aEzAHTWoezk3Ds1yUXDxRqqNFq7gSe1PVmj7oE1jim1' }
-            { name: 'PINECONE_INDEX', value: 'coaching-platform' }
-            { name: 'RESEND_API_KEY', value: 'REDACTED_RESEND_API_KEY' }
-            { name: 'FROM_EMAIL', value: '' }
-            { name: 'PLATFORM_DOMAIN', value: 'coaching-platform-prod-shell.azurewebsites.net' }
-            { name: 'PLATFORM_CUT_PCT', value: '' }
-            { name: 'STRIPE_SECRET_KEY', value: 'REDACTED_STRIPE_SECRET_KEY' }
-            { name: 'STRIPE_PUBLISHABLE_KEY', value: '' }
-            { name: 'STRIPE_WEBHOOK_SECRET', value: 'whsec_55e3aca3c3bf3cecaf2746d1fb1a8e8091b8a7b78a986d2486560e1b2747579f' }
-            { name: 'RAZORPAY_KEY_ID', value: '' }
-            { name: 'RAZORPAY_KEY_SECRET', value: '' }
-            { name: 'RAZORPAY_WEBHOOK_SECRET', value: '' }
-            { name: 'SKILLZ_AGENT_CALENDAR_AGGREGATOR_URL', value: '' }
-            { name: 'SKILLZ_AGENT_CUSTOMER_BOOKING_URL', value: '' }
-            { name: 'SKILLZ_AGENT_PAYMENT_URL', value: '' }
-            { name: 'GOOGLE_CLIENT_ID', value: '785608934518-1ltj9d76l5d9340a9ektf0bvkgi6jktj.apps.googleusercontent.com' }
-            { name: 'GOOGLE_CLIENT_SECRET', value: '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' }
-            { name: 'GOOGLE_REDIRECT_URI', value: 'https://coaching-platform-prod-shell.azurewebsites.net/api/auth/google-calendar/callback' }
-            { name: 'GMAIL_REDIRECT_URI', value: 'https://coaching-platform-prod-shell.azurewebsites.net/api/auth/gmail/callback' }
+            { name: 'SUPABASE_URL', secretRef: 'supabase-url' }
+            { name: 'SUPABASE_ANON_KEY', secretRef: 'supabase-anon-key' }
+            { name: 'SUPABASE_SERVICE_ROLE_KEY', secretRef: 'supabase-service-role-key' }
+            { name: 'SHELL_INTERNAL_TOKEN', secretRef: 'shell-internal-token' }
+            { name: 'LLM_PROVIDER', secretRef: 'llm-provider' }
+            { name: 'AZURE_OPENAI_ENDPOINT', secretRef: 'azure-openai-endpoint' }
+            { name: 'AZURE_OPENAI_API_KEY', secretRef: 'azure-openai-api-key' }
+            { name: 'AZURE_OPENAI_DEPLOYMENT', secretRef: 'azure-openai-deployment' }
+            { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', secretRef: 'azure-openai-embedding-deployment' }
+            { name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }
+            { name: 'YOUTUBE_API_KEY', secretRef: 'youtube-api-key' }
+            { name: 'PINECONE_API_KEY', secretRef: 'pinecone-api-key' }
+            { name: 'PINECONE_INDEX', secretRef: 'pinecone-index' }
+            { name: 'RESEND_API_KEY', secretRef: 'resend-api-key' }
+            { name: 'FROM_EMAIL', secretRef: 'from-email' }
+            { name: 'PLATFORM_DOMAIN', secretRef: 'platform-domain' }
+            { name: 'PLATFORM_CUT_PCT', secretRef: 'platform-cut-pct' }
+            { name: 'STRIPE_SECRET_KEY', secretRef: 'stripe-secret-key' }
+            { name: 'STRIPE_PUBLISHABLE_KEY', secretRef: 'stripe-publishable-key' }
+            { name: 'STRIPE_WEBHOOK_SECRET', secretRef: 'stripe-webhook-secret' }
+            { name: 'RAZORPAY_KEY_ID', secretRef: 'razorpay-key-id' }
+            { name: 'RAZORPAY_KEY_SECRET', secretRef: 'razorpay-key-secret' }
+            { name: 'RAZORPAY_WEBHOOK_SECRET', secretRef: 'razorpay-webhook-secret' }
+            { name: 'GOOGLE_CLIENT_ID', secretRef: 'google-client-id' }
+            { name: 'GOOGLE_CLIENT_SECRET', secretRef: 'google-client-secret' }
+            { name: 'GOOGLE_REDIRECT_URI', secretRef: 'google-redirect-uri' }
+            { name: 'GMAIL_REDIRECT_URI', secretRef: 'gmail-redirect-uri' }
           ]
         }
       ]
       scale: {
-        minReplicas: 1      // Single replica baseline (~70% savings vs 7x min replicas)
-        maxReplicas: 5      // Can scale up under load
+        minReplicas: 1
+        maxReplicas: 5
       }
     }
   }
 }
 
-// Individual Agent Container Apps (REPLACED BY MULTI-AGENT ABOVE - kept for reference)
-/*
-// Agent 01: Program Builder
-resource programBuilderApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-01'
+// Shell Container App (Next.js frontend)
+resource shellApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
+  name: 'coachprod-shell'
   location: location
   properties: {
     managedEnvironmentId: containerAppsEnv.id
@@ -107,16 +124,57 @@ resource programBuilderApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
         external: true
         targetPort: 3000
       }
+      registries: [
+        {
+          server: 'ghcr.io'
+          username: ghcrOwner
+          passwordSecretRef: 'ghcr-password'
+        }
+      ]
+      secrets: sharedSecrets
     }
     template: {
       containers: [
         {
-          name: 'program-builder'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          name: 'shell'
+          image: 'ghcr.io/${ghcrOwner}/shell:latest'
           resources: {
             cpu: json('0.5')
             memory: '1Gi'
           }
+          env: [
+            { name: 'NEXT_PUBLIC_SUPABASE_URL', secretRef: 'supabase-url' }
+            { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', secretRef: 'supabase-anon-key' }
+            { name: 'SUPABASE_URL', secretRef: 'supabase-url' }
+            { name: 'SUPABASE_ANON_KEY', secretRef: 'supabase-anon-key' }
+            { name: 'SUPABASE_SERVICE_ROLE_KEY', secretRef: 'supabase-service-role-key' }
+            { name: 'SHELL_INTERNAL_TOKEN', secretRef: 'shell-internal-token' }
+            { name: 'LLM_PROVIDER', secretRef: 'llm-provider' }
+            { name: 'AZURE_OPENAI_ENDPOINT', secretRef: 'azure-openai-endpoint' }
+            { name: 'AZURE_OPENAI_API_KEY', secretRef: 'azure-openai-api-key' }
+            { name: 'AZURE_OPENAI_DEPLOYMENT', secretRef: 'azure-openai-deployment' }
+            { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', secretRef: 'azure-openai-embedding-deployment' }
+            { name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }
+            { name: 'YOUTUBE_API_KEY', secretRef: 'youtube-api-key' }
+            { name: 'PINECONE_API_KEY', secretRef: 'pinecone-api-key' }
+            { name: 'PINECONE_INDEX', secretRef: 'pinecone-index' }
+            { name: 'RESEND_API_KEY', secretRef: 'resend-api-key' }
+            { name: 'FROM_EMAIL', secretRef: 'from-email' }
+            { name: 'PLATFORM_DOMAIN', secretRef: 'platform-domain' }
+            { name: 'PLATFORM_CUT_PCT', secretRef: 'platform-cut-pct' }
+            { name: 'STRIPE_SECRET_KEY', secretRef: 'stripe-secret-key' }
+            { name: 'STRIPE_PUBLISHABLE_KEY', secretRef: 'stripe-publishable-key' }
+            { name: 'STRIPE_WEBHOOK_SECRET', secretRef: 'stripe-webhook-secret' }
+            { name: 'RAZORPAY_KEY_ID', secretRef: 'razorpay-key-id' }
+            { name: 'RAZORPAY_KEY_SECRET', secretRef: 'razorpay-key-secret' }
+            { name: 'RAZORPAY_WEBHOOK_SECRET', secretRef: 'razorpay-webhook-secret' }
+            { name: 'GOOGLE_CLIENT_ID', secretRef: 'google-client-id' }
+            { name: 'GOOGLE_CLIENT_SECRET', secretRef: 'google-client-secret' }
+            { name: 'GOOGLE_REDIRECT_URI', secretRef: 'google-redirect-uri' }
+            { name: 'GMAIL_REDIRECT_URI', secretRef: 'gmail-redirect-uri' }
+            { name: 'MULTI_AGENT_MODE', value: 'true' }
+            { name: 'MULTI_AGENT_BASE_URL', value: 'https://${multiAgentApp.properties.configuration.ingress.fqdn}' }
+          ]
         }
       ]
       scale: {
@@ -126,193 +184,7 @@ resource programBuilderApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
     }
   }
 }
-
-// Agent 02: Program Runner
-resource programRunnerApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-02'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'program-runner'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 3
-      }
-    }
-  }
-}
-
-// Agent 03: Coach Library
-resource coachLibraryApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-03'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'coach-library'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 2
-      }
-    }
-  }
-}
-
-// Agent 04: Persona Chat
-resource personaChatApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-04'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'persona-chat'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 3
-      }
-    }
-  }
-}
-
-// Agent 05: CRM
-resource crmApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-05'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'crm'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 2
-      }
-    }
-  }
-}
-
-// Agent 06: Licensing
-resource licensingApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-06'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'licensing'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 2
-      }
-    }
-  }
-}
-
-// Agent 07: Payment
-resource paymentApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
-  name: 'coachprod-07'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppsEnv.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 3000
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'payment'
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
-          }
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 2
-      }
-    }
-  }
-}
-*/
 
 output environmentName string = containerAppsEnv.name
 output multiAgentUrl string = multiAgentApp.properties.configuration.ingress.fqdn
+output shellUrl string = shellApp.properties.configuration.ingress.fqdn

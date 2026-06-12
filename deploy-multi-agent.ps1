@@ -77,7 +77,7 @@ Write-Host "☁️  Step 5: Deploying infrastructure to Azure..." -ForegroundCol
 Write-Host "   This will:" -ForegroundColor Gray
 Write-Host "   - Delete 7 existing container apps (coachprod-01 to coachprod-07)" -ForegroundColor Gray
 Write-Host "   - Create 1 new multi-agent container app (coachprod-multi)" -ForegroundColor Gray
-Write-Host "   - ~70% cost reduction ($180-250/mo → $50-75/mo)" -ForegroundColor Gray
+Write-Host "   - Approximately 70% cost reduction" -ForegroundColor Gray
 Write-Host ""
 
 $confirm = Read-Host "   Proceed with deployment? (yes/no)"
@@ -189,4 +189,4 @@ Write-Host "  2. Test your shell app at https://coaching-platform-prod-shell.azu
 Write-Host "  3. Monitor logs: az containerapp logs show --name coachprod-multi --resource-group $RESOURCE_GROUP" -ForegroundColor Gray
 Write-Host "  4. Check cost reduction in Azure Cost Management after 24 hours" -ForegroundColor Gray
 Write-Host ""
-Write-Host "💰 Expected savings: ~$130-175/month (~70% reduction)" -ForegroundColor Green
+Write-Host "💰 Expected savings: Approximately $130-175/month (about 70% reduction)" -ForegroundColor Green

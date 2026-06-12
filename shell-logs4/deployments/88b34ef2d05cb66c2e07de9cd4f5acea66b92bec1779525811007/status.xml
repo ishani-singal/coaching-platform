@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>88b34ef2d05cb66c2e07de9cd4f5acea66b92bec1779525811007</id>
+  <author>ishani-singal</author>
+  <deployer>GitHub</deployer>
+  <authorEmail />
+  <message>{"type":"Deployment","sha":"88b34ef2d05cb66c2e07de9cd4f5acea66b92bec","repoName":"ishani-singal/coaching-platform","actor":"ishani-singal","slotName":"production"}</message>
+  <progress />
+  <status>Success</status>
+  <statusText />
+  <lastSuccessEndTime>2026-05-23T08:43:31.1610242Z</lastSuccessEndTime>
+  <receivedTime>2026-05-23T08:43:31.1610242Z</receivedTime>
+  <startTime>2026-05-23T08:43:31.1610242Z</startTime>
+  <endTime>2026-05-23T08:43:31.1610242Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <containerId>6e33694ddc22</containerId>
+  <buildSummary />
+</deployment>

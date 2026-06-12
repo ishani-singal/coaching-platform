@@ -31,13 +31,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      // Surface the Supabase error (e.g. "User already registered") to the client.
+      console.error('[signup] Supabase error:', error);
       return NextResponse.json({ error: error.message }, { status: error.status ?? 400 });
     }
 
     return NextResponse.json({ id: data.user.id }, { status: 201 });
   } catch (e: unknown) {
-    console.error('[signup] Unexpected error:', e);
-    return NextResponse.json({ error: (e as Error).message ?? 'Signup failed.' }, { status: 500 });
+    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error('[signup] Unexpected error:', msg);
+    return NextResponse.json({ error: msg || 'Signup failed.' }, { status: 500 });
   }
 }

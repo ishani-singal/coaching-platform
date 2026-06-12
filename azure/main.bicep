@@ -3,33 +3,13 @@ targetScope = 'subscription'
 param location string = 'centralus'
 param environment string = 'prod'
 param projectName string = 'coaching-platform'
+param ghcrOwner string
 
-var resourceGroupName = '${projectName}-${environment}-rg'
-var containerRegistryName = replace('${projectName}${environment}', '-', '')
+var resourceGroupName = '${projectName}-v2-rg'
 
-// Create resource group
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName
   location: location
-}
-
-// Deploy all resources
-module acr 'modules/acr.bicep' = {
-  scope: rg
-  name: 'acr-deployment'
-  params: {
-    location: location
-    registryName: containerRegistryName
-  }
-}
-
-module keyVault 'modules/keyvault.bicep' = {
-  scope: rg
-  name: 'keyvault-deployment'
-  params: {
-    location: location
-    environment: environment
-  }
 }
 
 module containerApps 'modules/container-apps.bicep' = {
@@ -39,23 +19,11 @@ module containerApps 'modules/container-apps.bicep' = {
     location: location
     projectName: projectName
     environment: environment
-  }
-}
-
-module appService 'modules/app-service.bicep' = {
-  scope: rg
-  name: 'app-service-deployment'
-  params: {
-    location: location
-    projectName: projectName
-    environment: environment
-    keyVaultName: keyVault.outputs.keyVaultName
-    acrLoginServer: acr.outputs.loginServer
-    acrName: acr.outputs.name
+    ghcrOwner: ghcrOwner
   }
 }
 
 output resourceGroupName string = rg.name
-output registryLoginServer string = acr.outputs.loginServer
 output containerAppsEnvironmentName string = containerApps.outputs.environmentName
-output appServiceName string = appService.outputs.appServiceName
+output multiAgentUrl string = containerApps.outputs.multiAgentUrl
+output shellUrl string = containerApps.outputs.shellUrl

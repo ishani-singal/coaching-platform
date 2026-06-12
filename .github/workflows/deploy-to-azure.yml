@@ -93,74 +93,137 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Seed secrets into coachprod-multi
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SHELL_INTERNAL_TOKEN: ${{ secrets.SHELL_INTERNAL_TOKEN }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          PLATFORM_DOMAIN: ${{ secrets.PLATFORM_DOMAIN }}
+          PLATFORM_CUT_PCT: ${{ secrets.PLATFORM_CUT_PCT }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          GMAIL_REDIRECT_URI: ${{ secrets.GMAIL_REDIRECT_URI }}
+          GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Build list of non-empty secrets only — az CLI rejects empty values
+          SECRETS=()
+          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2"); }
+          add_secret "supabase-url"                    "$SUPABASE_URL"
+          add_secret "supabase-anon-key"               "$SUPABASE_ANON_KEY"
+          add_secret "supabase-service-role-key"       "$SUPABASE_SERVICE_ROLE_KEY"
+          add_secret "shell-internal-token"            "$SHELL_INTERNAL_TOKEN"
+          add_secret "llm-provider"                    "$LLM_PROVIDER"
+          add_secret "azure-openai-endpoint"           "$AZURE_OPENAI_ENDPOINT"
+          add_secret "azure-openai-api-key"            "$AZURE_OPENAI_API_KEY"
+          add_secret "azure-openai-deployment"         "$AZURE_OPENAI_DEPLOYMENT"
+          add_secret "azure-openai-embedding-deployment" "$AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
+          add_secret "gemini-api-key"                  "$GEMINI_API_KEY"
+          add_secret "youtube-api-key"                 "$YOUTUBE_API_KEY"
+          add_secret "pinecone-api-key"                "$PINECONE_API_KEY"
+          add_secret "pinecone-index"                  "$PINECONE_INDEX"
+          add_secret "resend-api-key"                  "$RESEND_API_KEY"
+          add_secret "from-email"                      "$FROM_EMAIL"
+          add_secret "platform-domain"                 "$PLATFORM_DOMAIN"
+          add_secret "platform-cut-pct"                "$PLATFORM_CUT_PCT"
+          add_secret "stripe-secret-key"               "$STRIPE_SECRET_KEY"
+          add_secret "stripe-publishable-key"          "$STRIPE_PUBLISHABLE_KEY"
+          add_secret "stripe-webhook-secret"           "$STRIPE_WEBHOOK_SECRET"
+          add_secret "razorpay-key-id"                 "$RAZORPAY_KEY_ID"
+          add_secret "razorpay-key-secret"             "$RAZORPAY_KEY_SECRET"
+          add_secret "razorpay-webhook-secret"         "$RAZORPAY_WEBHOOK_SECRET"
+          add_secret "google-client-id"                "$GOOGLE_CLIENT_ID"
+          add_secret "google-client-secret"            "$GOOGLE_CLIENT_SECRET"
+          add_secret "google-redirect-uri"             "$GOOGLE_REDIRECT_URI"
+          add_secret "gmail-redirect-uri"              "$GMAIL_REDIRECT_URI"
+          add_secret "ghcr-password"                   "$GHCR_PASSWORD"
           az containerapp secret set \
             --name coachprod-multi \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --secrets \
-              "supabase-url=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-              "supabase-anon-key=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-              "supabase-service-role-key=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              "shell-internal-token=${{ secrets.SHELL_INTERNAL_TOKEN }}" \
-              "llm-provider=${{ secrets.LLM_PROVIDER }}" \
-              "azure-openai-endpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
-              "azure-openai-api-key=${{ secrets.AZURE_OPENAI_API_KEY }}" \
-              "azure-openai-deployment=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
-              "azure-openai-embedding-deployment=${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
-              "gemini-api-key=${{ secrets.GEMINI_API_KEY }}" \
-              "youtube-api-key=${{ secrets.YOUTUBE_API_KEY }}" \
-              "pinecone-api-key=${{ secrets.PINECONE_API_KEY }}" \
-              "pinecone-index=${{ secrets.PINECONE_INDEX }}" \
-              "resend-api-key=${{ secrets.RESEND_API_KEY }}" \
-              "from-email=${{ secrets.FROM_EMAIL }}" \
-              "platform-domain=${{ secrets.PLATFORM_DOMAIN }}" \
-              "platform-cut-pct=${{ secrets.PLATFORM_CUT_PCT }}" \
-              "stripe-secret-key=${{ secrets.STRIPE_SECRET_KEY }}" \
-              "stripe-publishable-key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
-              "stripe-webhook-secret=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-              "razorpay-key-id=${{ secrets.RAZORPAY_KEY_ID }}" \
-              "razorpay-key-secret=${{ secrets.RAZORPAY_KEY_SECRET }}" \
-              "razorpay-webhook-secret=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
-              "google-client-id=${{ secrets.GOOGLE_CLIENT_ID }}" \
-              "google-client-secret=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-              "google-redirect-uri=${{ secrets.GOOGLE_REDIRECT_URI }}" \
-              "gmail-redirect-uri=${{ secrets.GMAIL_REDIRECT_URI }}" \
-              "ghcr-password=${{ secrets.GITHUB_TOKEN }}"
+            --secrets "${SECRETS[@]}"
 
       - name: Seed secrets into coachprod-shell
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SHELL_INTERNAL_TOKEN: ${{ secrets.SHELL_INTERNAL_TOKEN }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          PLATFORM_DOMAIN: ${{ secrets.PLATFORM_DOMAIN }}
+          PLATFORM_CUT_PCT: ${{ secrets.PLATFORM_CUT_PCT }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          GMAIL_REDIRECT_URI: ${{ secrets.GMAIL_REDIRECT_URI }}
+          GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          SECRETS=()
+          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2"); }
+          add_secret "supabase-url"                    "$SUPABASE_URL"
+          add_secret "supabase-anon-key"               "$SUPABASE_ANON_KEY"
+          add_secret "supabase-service-role-key"       "$SUPABASE_SERVICE_ROLE_KEY"
+          add_secret "shell-internal-token"            "$SHELL_INTERNAL_TOKEN"
+          add_secret "llm-provider"                    "$LLM_PROVIDER"
+          add_secret "azure-openai-endpoint"           "$AZURE_OPENAI_ENDPOINT"
+          add_secret "azure-openai-api-key"            "$AZURE_OPENAI_API_KEY"
+          add_secret "azure-openai-deployment"         "$AZURE_OPENAI_DEPLOYMENT"
+          add_secret "azure-openai-embedding-deployment" "$AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
+          add_secret "gemini-api-key"                  "$GEMINI_API_KEY"
+          add_secret "youtube-api-key"                 "$YOUTUBE_API_KEY"
+          add_secret "pinecone-api-key"                "$PINECONE_API_KEY"
+          add_secret "pinecone-index"                  "$PINECONE_INDEX"
+          add_secret "resend-api-key"                  "$RESEND_API_KEY"
+          add_secret "from-email"                      "$FROM_EMAIL"
+          add_secret "platform-domain"                 "$PLATFORM_DOMAIN"
+          add_secret "platform-cut-pct"                "$PLATFORM_CUT_PCT"
+          add_secret "stripe-secret-key"               "$STRIPE_SECRET_KEY"
+          add_secret "stripe-publishable-key"          "$STRIPE_PUBLISHABLE_KEY"
+          add_secret "stripe-webhook-secret"           "$STRIPE_WEBHOOK_SECRET"
+          add_secret "razorpay-key-id"                 "$RAZORPAY_KEY_ID"
+          add_secret "razorpay-key-secret"             "$RAZORPAY_KEY_SECRET"
+          add_secret "razorpay-webhook-secret"         "$RAZORPAY_WEBHOOK_SECRET"
+          add_secret "google-client-id"                "$GOOGLE_CLIENT_ID"
+          add_secret "google-client-secret"            "$GOOGLE_CLIENT_SECRET"
+          add_secret "google-redirect-uri"             "$GOOGLE_REDIRECT_URI"
+          add_secret "gmail-redirect-uri"              "$GMAIL_REDIRECT_URI"
+          add_secret "ghcr-password"                   "$GHCR_PASSWORD"
           az containerapp secret set \
             --name coachprod-shell \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --secrets \
-              "supabase-url=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-              "supabase-anon-key=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-              "supabase-service-role-key=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              "shell-internal-token=${{ secrets.SHELL_INTERNAL_TOKEN }}" \
-              "llm-provider=${{ secrets.LLM_PROVIDER }}" \
-              "azure-openai-endpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
-              "azure-openai-api-key=${{ secrets.AZURE_OPENAI_API_KEY }}" \
-              "azure-openai-deployment=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
-              "azure-openai-embedding-deployment=${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
-              "gemini-api-key=${{ secrets.GEMINI_API_KEY }}" \
-              "youtube-api-key=${{ secrets.YOUTUBE_API_KEY }}" \
-              "pinecone-api-key=${{ secrets.PINECONE_API_KEY }}" \
-              "pinecone-index=${{ secrets.PINECONE_INDEX }}" \
-              "resend-api-key=${{ secrets.RESEND_API_KEY }}" \
-              "from-email=${{ secrets.FROM_EMAIL }}" \
-              "platform-domain=${{ secrets.PLATFORM_DOMAIN }}" \
-              "platform-cut-pct=${{ secrets.PLATFORM_CUT_PCT }}" \
-              "stripe-secret-key=${{ secrets.STRIPE_SECRET_KEY }}" \
-              "stripe-publishable-key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
-              "stripe-webhook-secret=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-              "razorpay-key-id=${{ secrets.RAZORPAY_KEY_ID }}" \
-              "razorpay-key-secret=${{ secrets.RAZORPAY_KEY_SECRET }}" \
-              "razorpay-webhook-secret=${{ secrets.RAZORPAY_WEBHOOK_SECRET }}" \
-              "google-client-id=${{ secrets.GOOGLE_CLIENT_ID }}" \
-              "google-client-secret=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-              "google-redirect-uri=${{ secrets.GOOGLE_REDIRECT_URI }}" \
-              "gmail-redirect-uri=${{ secrets.GMAIL_REDIRECT_URI }}" \
-              "ghcr-password=${{ secrets.GITHUB_TOKEN }}"
+            --secrets "${SECRETS[@]}"
 
   # ---- Build and deploy multi-agent container ----
   deploy-agents:

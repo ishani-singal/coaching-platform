@@ -125,7 +125,7 @@ jobs:
         run: |
           # Build list of non-empty secrets only — az CLI rejects empty values
           SECRETS=()
-          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2"); }
+          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2") || true; }
           add_secret "supabase-url"                    "$SUPABASE_URL"
           add_secret "supabase-anon-key"               "$SUPABASE_ANON_KEY"
           add_secret "supabase-service-role-key"       "$SUPABASE_SERVICE_ROLE_KEY"
@@ -154,10 +154,14 @@ jobs:
           add_secret "google-redirect-uri"             "$GOOGLE_REDIRECT_URI"
           add_secret "gmail-redirect-uri"              "$GMAIL_REDIRECT_URI"
           add_secret "ghcr-password"                   "$GHCR_PASSWORD"
-          az containerapp secret set \
-            --name coachprod-multi \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --secrets "${SECRETS[@]}"
+          if [ ${#SECRETS[@]} -eq 0 ]; then
+            echo "No secrets to seed into coachprod-multi, skipping."
+          else
+            az containerapp secret set \
+              --name coachprod-multi \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --secrets "${SECRETS[@]}"
+          fi
 
       - name: Seed secrets into coachprod-shell
         env:
@@ -191,7 +195,7 @@ jobs:
           GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SECRETS=()
-          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2"); }
+          add_secret() { [ -n "$2" ] && SECRETS+=("$1=$2") || true; }
           add_secret "supabase-url"                    "$SUPABASE_URL"
           add_secret "supabase-anon-key"               "$SUPABASE_ANON_KEY"
           add_secret "supabase-service-role-key"       "$SUPABASE_SERVICE_ROLE_KEY"
@@ -220,10 +224,14 @@ jobs:
           add_secret "google-redirect-uri"             "$GOOGLE_REDIRECT_URI"
           add_secret "gmail-redirect-uri"              "$GMAIL_REDIRECT_URI"
           add_secret "ghcr-password"                   "$GHCR_PASSWORD"
-          az containerapp secret set \
-            --name coachprod-shell \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --secrets "${SECRETS[@]}"
+          if [ ${#SECRETS[@]} -eq 0 ]; then
+            echo "No secrets to seed into coachprod-shell, skipping."
+          else
+            az containerapp secret set \
+              --name coachprod-shell \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --secrets "${SECRETS[@]}"
+          fi
 
   # ---- Build and deploy multi-agent container ----
   deploy-agents:

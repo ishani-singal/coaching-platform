@@ -30,14 +30,14 @@ resource multiAgentApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
           name: 'multi-agent'
           image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           resources: {
-            cpu: json('2.0')
-            memory: '4Gi'
+            cpu: json('0.25')
+            memory: '0.5Gi'
           }
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 5
+        minReplicas: 0
+        maxReplicas: 1
       }
     }
   }
@@ -63,14 +63,14 @@ resource shellApp 'Microsoft.App/containerApps@2023-04-01-preview' = {
           name: 'shell'
           image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('0.25')
+            memory: '0.5Gi'
           }
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 3
+        minReplicas: 0
+        maxReplicas: 1
       }
     }
   }

@@ -43,6 +43,7 @@ jobs:
               - 'packages/skills/**'
               - 'Dockerfile.agent'
               - 'pnpm-lock.yaml'
+              - 'azure/**'
               - '.github/workflows/**'
             shell:
               - 'shell/**'
@@ -51,6 +52,7 @@ jobs:
               - 'packages/skills/**'
               - 'shell/Dockerfile'
               - 'pnpm-lock.yaml'
+              - 'azure/**'
               - '.github/workflows/**'
 
   # ---- Deploy Bicep infrastructure (idempotent) ----

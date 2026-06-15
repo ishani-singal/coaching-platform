@@ -1,4 +1,4 @@
-﻿ARG AGENT_NAME=01-program-builder
+ARG AGENT_NAME=01-program-builder
 ARG AGENT_MODE=single
 
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
@@ -16,11 +16,6 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/sdk ./packages/sdk
 COPY packages/tools ./packages/tools
 COPY packages/skills ./packages/skills
-
-# Copy agents (multi-agent mode needs all, single mode needs one)
-# Note: Docker COPY doesn't support conditional syntax, so we copy differently based on context
-# When building with AGENT_MODE=multi, ensure all agent directories are in build context
-# When building with AGENT_MODE=single (default), only the specific agent is needed
 COPY packages/agents ./packages/agents
 
 # Install all workspace deps
@@ -39,27 +34,36 @@ RUN if [ "$AGENT_MODE" = "multi" ]; then \
       pnpm --filter "./packages/agents/${AGENT_NAME}" build; \
     fi
 
-# Bundle into a single self-contained file (resolves all workspace deps)
-RUN if [ "$AGENT_MODE" = "multi" ]; then \
-      npx --yes @vercel/ncc build packages/agents/dist/multi-agent-server.js \
-        -o /bundle \
-        --minify \
-        --no-cache; \
-    else \
-      npx --yes @vercel/ncc build packages/agents/${AGENT_NAME}/dist/index.js \
-        -o /bundle \
-        --minify \
-        --no-cache; \
-    fi
-
 # ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=builder /bundle/index.js ./index.js
 
-# All agents listen on 3000 inside the container (matches Container App targetPort: 3000).
-# Local dev overrides these via .env (3001–3007). All vars are set so whichever agent
-# binary is running will find its own port var already pointing to 3000.
+RUN npm install -g pnpm@10.33.0
+
+# Copy workspace config and source so pnpm can wire up the workspace
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/sdk ./packages/sdk
+COPY packages/tools ./packages/tools
+COPY packages/skills ./packages/skills
+COPY packages/agents ./packages/agents
+
+# Install production deps only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built dist outputs from builder
+COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
+COPY --from=builder /app/packages/tools/dist ./packages/tools/dist
+COPY --from=builder /app/packages/skills/dist ./packages/skills/dist
+COPY --from=builder /app/packages/agents/dist ./packages/agents/dist
+COPY --from=builder /app/packages/agents/01-program-builder/dist ./packages/agents/01-program-builder/dist
+COPY --from=builder /app/packages/agents/02-program-runner/dist ./packages/agents/02-program-runner/dist
+COPY --from=builder /app/packages/agents/03-coach-library/dist ./packages/agents/03-coach-library/dist
+COPY --from=builder /app/packages/agents/04-persona-chat/dist ./packages/agents/04-persona-chat/dist
+COPY --from=builder /app/packages/agents/05-crm/dist ./packages/agents/05-crm/dist
+COPY --from=builder /app/packages/agents/06-licensing/dist ./packages/agents/06-licensing/dist
+COPY --from=builder /app/packages/agents/07-payment/dist ./packages/agents/07-payment/dist
+
+# All agents listen on 3000 inside the container
 ENV AGENT_PROGRAM_BUILDER_PORT=3000 \
     AGENT_PROGRAM_RUNNER_PORT=3000 \
     AGENT_COACH_LIBRARY_PORT=3000 \
@@ -69,4 +73,4 @@ ENV AGENT_PROGRAM_BUILDER_PORT=3000 \
     AGENT_PAYMENT_PORT=3000
 
 EXPOSE 3000
-CMD ["node", "index.js"]
+CMD ["node", "packages/agents/dist/multi-agent-server.js"]

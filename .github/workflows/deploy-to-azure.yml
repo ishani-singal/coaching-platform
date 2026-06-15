@@ -81,6 +81,18 @@ jobs:
               location=${{ env.LOCATION }} \
               projectName=coaching-platform
 
+      - name: Enforce container sizing on both apps
+        run: |
+          for app in coachprod-multi coachprod-shell; do
+            az containerapp update \
+              --name $app \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --cpu 0.25 \
+              --memory 0.5Gi \
+              --min-replicas 0 \
+              --max-replicas 1
+          done
+
   # ---- Seed secrets into both Container Apps ----
   seed-secrets:
     runs-on: ubuntu-latest
